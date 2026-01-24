@@ -1,4 +1,4 @@
-# PROJECT:Domino
+# PROJECT:Domino v0.02
 
 ## 项目描述  
 一个语音陪伴agents
@@ -11,7 +11,7 @@ ram:16gb
 ## 语音部分  
 先要有单独的语音识别模型  
 
-由于没办法使用cuda，尝试使用ONNX Runtime提供的directML来跑Whisper 模型  
+当前决定放弃折腾directml，直接使用阿里的SenseVoice，用cpu跑的速度还行  
 
 
 ## 将要实现：  
@@ -21,6 +21,10 @@ ram:16gb
 3. 语音输出  
 4. 反控处理   
 
+## 已经实现  
+
+1. 从计算机输入设备直接捕捉并处理音频信息
 ## 记录  
 
 实现非实时语音识别  --2026/1/24  
+更换阿里的SenseVoice，提升处理速度，使用sounddevice，实现从计算机输入设备直接捕捉并处理音频信息  --2026/1/24

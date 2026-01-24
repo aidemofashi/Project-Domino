@@ -1,2 +1,17 @@
-onnxruntime-directml
-faster-whisper
+# (CPU版)
+--index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+torchaudio
+
+# 语音识别核心库
+funasr
+modelscope
+editdistance
+
+# 音频处理与硬件交互
+sounddevice
+numpy
+pyaudio
+
+# 实用工具
+matplotlib
