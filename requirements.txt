@@ -14,4 +14,3 @@ numpy
 pyaudio
 
 # 实用工具
-matplotlib
