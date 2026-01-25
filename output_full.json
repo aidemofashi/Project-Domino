@@ -1,4 +1,22 @@
-{
-    "text": "<|zh|><|NEUTRAL|><|Speech|><|woitn|>现在记住你叫多米诺",
-    "datetime": "2026-01-24 20:49:56"
-}
+[
+    {
+        "text": "<|zh|><|NEUTRAL|><|Speech|><|woitn|>你好多米诺",
+        "datetime": "2026-01-25 18:38:04"
+    },
+    {
+        "text": "<|zh|><|NEUTRAL|><|Speech|><|woitn|>我是魔法师你的制造者",
+        "datetime": "2026-01-25 18:38:22"
+    },
+    {
+        "text": "<|zh|><|NEUTRAL|><|Speech|><|woitn|>你好多米诺我是钟华宇",
+        "datetime": "2026-01-25 18:41:18"
+    },
+    {
+        "text": "<|zh|><|NEUTRAL|><|Speech|><|woitn|>你好啊多米诺",
+        "datetime": "2026-01-25 18:46:46"
+    },
+    {
+        "text": "<|zh|><|NEUTRAL|><|Speech|><|woitn|>能听到我说话吗",
+        "datetime": "2026-01-25 18:47:04"
+    }
+]

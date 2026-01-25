@@ -4,8 +4,7 @@ import os
 import json
 from funasr import AutoModel
 import time
-#路径处理
-
+#路径处理,当前先不用
 dir = "./"
 
 # 声音处理
@@ -23,9 +22,9 @@ print("录音结束，正在识别...")
 audio_data = audio.flatten()
 
 # 初始化模型 (建议加上 disable_update=True 跳过每次启动的检查)
-model = AutoModel(model="iic/SenseVoiceSmall", device="cpu", disable_update=True)
+model = AutoModel(model="iic/SenseVoiceSmall",vad_model="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch", device="cpu", disable_update=True)
 
-# 进行识别
+# 启动模型
 res = model.generate(input=audio_data, cache={}, language="zh")
 
 if res:
@@ -33,16 +32,19 @@ if res:
     print(res[0]['text'])
 
 if res:
-    # 1. 记录当前时间
-    # 秒级浮点数 (例如: 1706096633.123)
-    unix_time = time.time() 
-    # 格式化时间字符串 (例如: "2026-01-24 20:45:00")
-    readable_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(unix_time))
-
-    # 2. 将新字段注入到结果字典中
-    res[0]['datetime'] = readable_time
+    # 1. 准备数据
+    res[0]['datetime'] = time.strftime("%Y-%m-%d %H:%M:%S")
     res[0].pop("key", None)
-    # 3. 保存文件
-    with open(os.path.join(dir, "output_full.json"), mode='w', encoding='utf-8') as file:
-        # res[0] 现在已经包含了 text, timestamp 和 datetime
-        json.dump(res[0], file, ensure_ascii=False, indent=4)
+
+    # 2. 读取并累加 (最少修改点)
+    if os.path.exists("output_full.json") and os.path.getsize("output_full.json") > 0:
+        with open("output_full.json", 'r', encoding='utf-8') as file:
+            contents = json.load(file)
+    else:
+        contents = [] # 如果文件不存在或为空，初始化列表
+
+    contents.append(res[0]) # 使用 append 实现累加
+
+    # 3. 保存
+    with open("output_full.json", 'w', encoding='utf-8') as file:
+        json.dump(contents, file, ensure_ascii=False, indent=4)
