@@ -1,36 +1,54 @@
-import numpy as np
 import os
 import json
 from funasr import AutoModel
 import time
-from audio_input import audio_input
+from audio_input import AudioInput
+import keyboard
+
 #路径处理,当前先不用
 dir = "./"
+s = 0
 # 初始化模型 (建议加上 disable_update=True 跳过每次启动的检查)
-model = AutoModel(model="iic/SenseVoiceSmall",vad_model="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch", device="cpu", disable_update=True)
+model = AutoModel(
+    model="iic/SenseVoiceSmall",
+    vad_model="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
+    device="cpu",
+    disable_pbar=True,
+    disable_update=True)
 
-audio_data = audio_input.audio_data
-# 启动模型
-res = model.generate(input=audio_data, cache={}, language="zh")
+print("\n提示：按[空格]键开始")
+keyboard.wait('space')
 
-if res:
-    print("\n识别结果：")
-    print(res[0]['text'])
+while True:
+    # 这里会进入监听状态，直到检测到声音并录制完毕
+    audio_data = AudioInput.record()
+    
+    if audio_data.size == 0:
+        print("未检测到有效声音")
+        continue
 
-if res:
-    # 1. 准备数据
-    res[0]['datetime'] = time.strftime("%Y-%m-%d %H:%M:%S")
-    res[0].pop("key", None)
+    print("正在识别...")
+    # SenseVoiceSmall 模型处理
+    res = model.generate(input=audio_data, cache={}, language="auto")
+    
+    if res and res[0]['text'].strip():
+        text = res[0]['text']
+        print(f"识别结果：{text}")
 
-    # 2. 读取并累加 (最少修改点)
-    if os.path.exists("output_full.json") and os.path.getsize("output_full.json") > 0:
-        with open("output_full.json", 'r', encoding='utf-8') as file:
-            contents = json.load(file)
-    else:
-        contents = [] # 如果文件不存在或为空，初始化列表
+        # 1. 准备数据
+        res[0]['datetime'] = time.strftime("%Y-%m-%d %H:%M:%S")
+        res[0].pop("key", None)
 
-    contents.append(res[0]) # 使用 append 实现累加
+        # 2. 读取并累加
+        filename = "output_full.json"
+        if os.path.exists(filename) and os.path.getsize(filename) > 0:
+            with open(filename, 'r', encoding='utf-8') as file:
+                contents = json.load(file)
+        else:
+            contents = []
 
-    # 3. 保存
-    with open("output_full.json", 'w', encoding='utf-8') as file:
-        json.dump(contents, file, ensure_ascii=False, indent=4)
+        contents.append(res[0])
+
+        # 3. 保存
+        with open(filename, 'w', encoding='utf-8') as file:
+            json.dump(contents, file, ensure_ascii=False, indent=4)
