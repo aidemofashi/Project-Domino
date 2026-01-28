@@ -3,7 +3,9 @@ import json
 from funasr import AutoModel
 import time
 from audio_input import AudioInput
+from filter import Filter
 import keyboard
+
 
 #路径处理,当前先不用
 dir = "./"
@@ -29,12 +31,11 @@ while True:
 
     print("正在识别...")
     # SenseVoiceSmall 模型处理
-    res = model.generate(input=audio_data, cache={}, language="auto")
+    res = model.generate(input=audio_data, cache={}, language="zh")
     
     if res and res[0]['text'].strip():
         text = res[0]['text']
         print(f"识别结果：{text}")
-
         # 1. 准备数据
         res[0]['datetime'] = time.strftime("%Y-%m-%d %H:%M:%S")
         res[0].pop("key", None)
@@ -46,8 +47,8 @@ while True:
                 contents = json.load(file)
         else:
             contents = []
-
-        contents.append(res[0])
+        if Filter.emo(res[0]['text']) != False:
+            contents.append(res[0])
 
         # 3. 保存
         with open(filename, 'w', encoding='utf-8') as file:

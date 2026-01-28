@@ -5,7 +5,7 @@ import collections
 class AudioInput:
     fs = 16000
     # --- 阈值设置 ---
-    THRESHOLD = 0.02       # 音量阈值（根据环境调整，0.01-0.05 常用）
+    THRESHOLD = 0.015       # 音量阈值（根据环境调整，0.01-0.05 常用）
     SILENCE_LIMIT = 1.5     # 静音持续多久（秒）后停止录音
     PRE_ROLL = 0.6          # 预录时长（秒），把说话前的一小段也存下来，防止掐头
 
@@ -26,8 +26,7 @@ class AudioInput:
         limit_chunks = int(cls.SILENCE_LIMIT * cls.fs / chunk_size)
 
         def callback(indata, frames, time, status):
-            nonlocal is_triggered, silent_chunks, recording
-            
+            nonlocal is_triggered, silent_chunks, recording 
             # 计算当前块的音量 (RMS)
             volume_norm = np.linalg.norm(indata) / np.sqrt(len(indata))
             
