@@ -4,11 +4,10 @@ import time
 import keyboard
 #模型
 from funasr import AutoModel
-#骨牌  
-from Tilps.Audio.audio_input import AudioInput  #语音输入  
-from Tilps.LLM.filter import Filter
-from Tilps.LLM.llm_input import llm_input
-from Tilps.Audio.audio_output import AudioOutput
+#文件
+from audio_input import AudioInput  #语音输入  
+from filter import Filter
+from llm_input import llm_input
 
 #路径处理,当前先不用
 dir = "./"
@@ -24,8 +23,6 @@ model = AutoModel(
     disable_update=True,
     local_files_only=True
     )
-
-tts_engine = AudioOutput()
 
 print("\n提示：按[空格]键开始")
 keyboard.wait('space')
@@ -54,6 +51,7 @@ while True:
         # 2. 读取并累加
         audio_input_file = "output_full.json"
         chat_file = "chat.json"
+
         if os.path.exists(audio_input_file) and os.path.getsize(audio_input_file) and os.path.exists(chat_file) and os.path.getsize(chat_file) > 0:
             with open(audio_input_file, 'r', encoding='utf-8') as file:
                 contents = json.load(file)
@@ -64,12 +62,10 @@ while True:
             chat = []
         if Filter.emo(res[0]['text']) != False:
             contents.append(res[0])
-            chat.append({"role": "user", "content": res[0]['text'] + "/no_think","time" : date_time})
+            # chat.append('"role": "Aidemofashi", "content": '+ res[0]['text'] + "/no_think")  # 错误
+            chat.append({"role": "user", "content": res[0]['text'] + "/no_think","time" : date_time})      # 正确
             # 讲识别的发送到llm
             response = llm_input.send_llm(chat)
-            if response:
-                print("\n说话中...")
-                tts_engine.text_to_speech(response)
             chat.append({"role": "assistant","content": response,"time" : date_time})
         # 3. 保存
         with open(audio_input_file, 'w', encoding='utf-8') as file:

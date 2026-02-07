@@ -1,6 +1,6 @@
 import openai
 # 本地 API 地址
-openai.api_base = "http://192.168.48.1:8888/v1" # LM Studio 默认端口
+openai.api_base = "http://192.168.111.1:8888/v1" # LM Studio 默认端口
 openai.api_key = " " # 可随意填写，本地不会校验
 
 class llm_input:
@@ -14,7 +14,7 @@ class llm_input:
         model="qwen/qwen3-4b-2507b", # 必须与 LM Studio 中加载的模型名称一致
         messages=input,
         temperature=0.6,
-        max_tokens=200,
+        max_tokens=500,
         stream=True,
         )
         full_reply = ""

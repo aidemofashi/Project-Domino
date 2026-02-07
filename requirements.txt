@@ -1,15 +1,18 @@
-# (CPU版)
-torch>=2.0.0
+# 音频处理与录音
+sounddevice>=0.4.0
+numpy>=1.21.0
+
+# 语音识别（SenseVoiceSmall + VAD）
+funasr>=1.0.0
+torch
 torchaudio
+# 语音合成（阿里云 DashScope TTS）
+dashscope>=1.15.0
 
-# 语音识别核心库
-funasr
-modelscope
-editdistance
+# 键盘监听（用于空格键启动）
+keyboard>=0.13.5
 
-# 音频处理与硬件交互
-sounddevice
-numpy
-pyaudio
+# OpenAI 兼容 API 客户端（用于连接 LM Studio）
+openai>=0.28.0,<1.0.0  # 注意：LM Studio 通常兼容旧版 openai 库
 
-# 实用工具
+# 标准库无需列出（如 json, os, time, re, collections 等）
