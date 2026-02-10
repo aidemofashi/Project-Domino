@@ -1,6 +1,6 @@
 import openai
 # 本地 API 地址
-openai.api_base = "http://192.168.111.1:8888/v1" # LM Studio 默认端口
+openai.api_base = "http://172.24.240.1:8888/v1" # LM Studio 默认端口
 openai.api_key = " " # 可随意填写，本地不会校验
 
 class llm_input:
@@ -11,7 +11,7 @@ class llm_input:
         if not all(isinstance(msg, dict) for msg in input):
             raise TypeError("messages 每项都需为 dict, 请检查 chat.json 数据格式！")
         response = openai.ChatCompletion.create(
-        model="qwen/qwen3-4b-2507b", # 必须与 LM Studio 中加载的模型名称一致
+        model="qwen/qwen3-4b-2507", # 必须与 LM Studio 中加载的模型名称一致
         messages=input,
         temperature=0.6,
         max_tokens=500,
