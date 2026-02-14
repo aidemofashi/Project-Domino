@@ -7,7 +7,7 @@ from funasr import AutoModel
 
 from Tilps.Audio.audio_input import AudioInput 
 from Tilps.LLM.filter import Filter
-from Tilps.LLM.llm_input import llm_input
+from Tilps.LLM.llm_input import LLMinput
 from Tilps.Audio.audio_output import AudioOutput
 from Tilps.ASR.asr import ASR
 
@@ -15,6 +15,14 @@ dir = "./"
 model_dir = "./models/SenseVoiceSmall"  
 vad_model_dir = "./models/speech_fsmn_vad_zh-cn-16k-common-pytorch"
 
+LLM_CONFIG = {
+    "api_base": "https://api.deepseek.com/v1",
+    "api_key": os.getenv("deepseek_api"),
+    "model_name": "deepseek-chat"
+}
+
+llm = LLMinput()
+llm.setting(LLM_CONFIG["api_base"], LLM_CONFIG["api_key"], LLM_CONFIG["model_name"])
 TTS_api = os.getenv('ALI_API')
 asr_setting = {"model":model_dir,"vad_model":vad_model_dir,"device":"cuda","disable_pbar":True,"disable_update":True,"local_files_only":True}
 # 初始化模型:
@@ -55,10 +63,10 @@ while True:
         chat = []
     if Filter.emo(res[0]['text']) != False:
         contents.append(res[0])
-        chat.append({"role": "user", "content": res[0]['text'] + "/no_think","time" : date_time})
+        chat.append({"role": "user", "content": res[0]['text'] + "/no_think"+"{data_time}","time" : date_time})
         # 讲识别的发送到llm
         try:
-            response = llm_input.send_llm(chat)
+            response = llm.send_llm(chat)
             if response:
                 try:
                     print("\n说话中...")
@@ -68,6 +76,8 @@ while True:
                     print("说话出问题")
         except:
             print("模型出问题")
+    else:
+        print(res[0]['text'])
     # 3. 保存
         with open(audio_input_file, 'w', encoding='utf-8') as file:
             json.dump(contents, file, ensure_ascii=False, indent=4)

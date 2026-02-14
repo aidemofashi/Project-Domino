@@ -7,7 +7,7 @@ class AudioInput:
     # --- 阈值设置 ---
     THRESHOLD = 0.015       # 音量阈值（根据环境调整，0.01-0.05 常用）
     SILENCE_LIMIT = 1.5     # 静音持续多久（秒）后停止录音
-    PRE_ROLL = 0.6          # 预录时长（秒），把说话前的一小段也存下来，防止掐头
+    PRE_ROLL = 1          # 预录时长（秒），把说话前的一小段也存下来，防止掐头
 
     @classmethod
     def record(cls):
