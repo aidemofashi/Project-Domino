@@ -20,7 +20,7 @@ MODEL_DIR = "./models/SenseVoiceSmall"
 ASR_SETTING = {
     "model": MODEL_DIR,
     "vad_model": None, 
-    "device": "cuda", # 如果没有 GPU 请改为 "cpu"
+    "device": "cpu", # 如果没有 GPU 请改为 "cpu"
     "disable_pbar": True,
     "disable_update": True,
     "local_files_only": True
