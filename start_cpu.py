@@ -5,14 +5,17 @@ import keyboard
 import sys
 import threading
 import queue
-import numpy as np
+
 
 # 骨牌组件导入
 from Tilps.LLM.filter import Filter
 from Tilps.LLM.llm_input import LLMinput
-from Tilps.Audio.audio_output import AudioOutput
+from Tilps.TTS.edgetts import AudioOutput
 from Tilps.ASR.asr import ASR
 from Tilps.VAD.vad_vosk import AudioInput  # 确保你已将上一步给你的 Vosk 代码保存为此路径
+from Tilps.mcp.shot import shot_screen
+from Tilps.LLM.view import viewllm_input
+from Tilps.LLM.trigger import TimerTrigger
 
 # --- 配置区域 ---
 MODEL_DIR = "./models/SenseVoiceSmall"
@@ -20,35 +23,42 @@ MODEL_DIR = "./models/SenseVoiceSmall"
 ASR_SETTING = {
     "model": MODEL_DIR,
     "vad_model": None, 
-    "device": "cpu", # 如果没有 GPU 请改为 "cpu"
+    "device": "cuda", # 如果没有 GPU 请改为 "cpu"
     "disable_pbar": True,
     "disable_update": True,
     "local_files_only": True
 }
 
 LLM_CONFIG = {
-    "api_base": "https://api.deepseek.com/v1",
-    "api_key": os.getenv("deepseek_api"),
-    "model_name": "deepseek-chat"
+    "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "api_key": os.getenv("ALI_API"),
+    "model_name": "qwen3-max"
+}
+
+VIEW_LLM_CONFIG = {
+    "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "api_key": os.getenv("ALI_API"),
+    "model_name": "qwen-vl-max-latest"
 }
 
 AUDIO_INPUT_FILE = "output_full.json"
-CHAT_FILE = "chat.json"
+CHAT_FILE = "chat.json" 
+SILENCE_TIMEOUT = 15  # 10秒没声音就触发
 
 # --- 初始化 ---
 def initialize():
     # 环境变量获取 TTS API
     tts_api = os.getenv("ALI_API")
-    
     # 组件实例化
     llm = LLMinput()
     llm.setting(LLM_CONFIG["api_base"], LLM_CONFIG["api_key"], LLM_CONFIG["model_name"])
     
     AudioOutput.input_api(tts_api)
     audio_out = AudioOutput()
-    ASR.set(ASR_SETTING)
     
-    return llm, audio_out
+    view=viewllm_input()
+    view.setting(VIEW_LLM_CONFIG["api_base"], VIEW_LLM_CONFIG["api_key"], VIEW_LLM_CONFIG["model_name"])
+    return llm, audio_out ,view
 
 def load_history():
     if os.path.exists(CHAT_FILE) and os.path.getsize(CHAT_FILE) > 0:
@@ -63,21 +73,25 @@ def save_history(chat):
         json.dump(chat, f, ensure_ascii=False, indent=4)
 
 def vosk_worker(res_queue):
-    """专门负责运行 Vosk 并在拿到结果后塞入队列"""
+    """专门负责运行 Vosk VAD 获取音频数据，然后交给 ASR 识别"""
     while True:
-        # 假设你的 AudioInput.record() 已经改成了返回识别后的 String 文本
+        # record() 返回音频数据数组
         audio_data = AudioInput.record() 
-        if np.any(audio_data > 0):
+        if audio_data is not None and len(audio_data) > 0:
             res_queue.put(audio_data)
 
 # --- 主程序逻辑 ---
 def main():
-    llm_input, audio_output = initialize()
+    ASR.set(ASR_SETTING)
+    llm_input, audio_output, view = initialize()
+    timer = TimerTrigger()
+    
     # 初始化队列
     res_queue = queue.Queue()
     
     print("\n" + "="*30)
     print("Vosk 线程模式已就绪")
+    print(f"静音 {SILENCE_TIMEOUT} 秒后助手会主动说话")
     print("提示：按 [空格] 键开始运行，按 [Esc] 退出")
     print("="*30)
     
@@ -88,52 +102,84 @@ def main():
     t.start()
     
     print("\n>>> 系统启动！请直接说话...")
-
+    
     while True:
         try:
-            if keyboard.is_pressed("esc"):
-                break
-            # 关键修改：从队列获取结果（阻塞直到 Vosk 线程塞入新文本）
-            # timeout=0.1 是为了让循环能回到顶部检查 esc 键
+            # if keyboard.is_pressed("esc"):
+            #     break
+
+            # 从队列获取结果
             try:
                 user_text = ASR.audio_input(input_audio_data=res_queue.get(timeout=0.1), lang="auto")
-            except queue.Empty:
-                continue
-
-            date_time = time.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"[{date_time}] 用户: {user_text}")
-
-            # 4. 过滤与对话处理
-            chat= load_history()
-
-            if Filter.emo(user_text[0]['text']) != False:
-                if not res_queue.empty(): # 发现新输入
-                    audio_output.stop()  
-                chat.append({
-                    "role": "user", 
-                    "content": f"{user_text}/no_think", 
-                    "time": date_time
-                })
-                print("思考中...")
-                response = llm_input.send_llm(chat)
                 
-                if response:
-                    s = threading.Thread(
-                            target=audio_output.text_to_speech, # 传入函数名，不带括号
-                            args=(response,),                   # 参数放在 args 元组里
-                            daemon=True)
-                    s.start()
-                    print("说话中...")
-                    
+                date_time = time.strftime("%Y-%m-%d %H:%M:%S")
+                print(f"[{date_time}] 用户: {user_text}")
+
+                # 过滤与对话处理
+                chat = load_history()
+                
+                if Filter.emo(user_text) != False:
+                    image = shot_screen()
+                    see = view.llm_view(image_path="shot.png")
                     chat.append({
-                        "role": "assistant", 
-                        "content": response, 
+                        "role": "user", 
+                        "content": f"{user_text} \n 屏幕: {see} \n{date_time}", 
                         "time": date_time
                     })
-                    save_history(chat)
-            else:
-                print(">>> 消息被 Filter 过滤。")
 
+                    print("思考中...")
+                    response = llm_input.send_llm(chat)
+                    
+                    if response:
+                        print("说话中...")
+                        audio_output.text_to_speech(response)
+
+                        chat.append({
+                            "role": "assistant", 
+                            "content": response, 
+                            "time": date_time
+                        })
+                        save_history(chat)
+                        # 有用户输入，标记活动
+                        timer.mark_activity()
+                else:
+                    print(">>> 消息被 Filter 过滤。")
+                    
+            except queue.Empty:
+                # 没有语音输入时，检查是否需要主动说话
+                if timer.should_trigger(SILENCE_TIMEOUT):
+                    date_time = time.strftime("%Y-%m-%d %H:%M:%S")
+                    print(f"\n[主动触发] 已静音 {SILENCE_TIMEOUT} 秒")
+                    
+                    # 截屏
+                    shot_screen()
+                    see = view.llm_view(image_path="shot.png")
+                    
+                    # 加载历史并添加
+                    chat = load_history()
+                    chat.append({
+                        "role": "user", 
+                        "content": f"主人没有说话，我看到屏幕上显示的是：{see}", 
+                        "time": date_time
+                    })
+                    print("思考中...")
+                    response = llm_input.send_llm(chat)
+
+                    if response:
+                        print(f"[助手主动]: {response}")
+                        print("说话中...")
+                        audio_output.text_to_speech(response)
+
+                        chat.append({
+                            "role": "assistant", 
+                            "content": response, 
+                            "time": date_time
+                        })
+                        save_history(chat)
+                    
+                    # 标记已触发
+                    timer.mark_trigger()
+                    
         except Exception as e:
             print(f"\n[运行错误]: {e}")
             time.sleep(1)

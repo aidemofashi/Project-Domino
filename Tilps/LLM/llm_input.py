@@ -1,7 +1,4 @@
 import openai
-# 本地 API 地址
-# openai.api_base = "http://127.0.0.1:8888/v1" # LM Studio 默认端口
-# openai.api_key = " " # 可随意填写，本地不会校验
 
 class LLMinput:
     def setting(self,api_base,api_key,model_name):

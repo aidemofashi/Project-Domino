@@ -77,6 +77,7 @@ class AudioInput:
                             # 如果已经开始录制但长时间没结束，强制结束
                             print("[VAD] 录音超时，强制结束")
                             break
+                    
                             
         except sd.CallbackStop:
             print("[VAD] 录音完成")

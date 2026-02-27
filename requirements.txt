@@ -13,3 +13,4 @@ keyboard>=0.13.5
 openai>=0.28.0,<1.0.0
 
 pydub
+vosk
