@@ -5,6 +5,7 @@ import numpy as np
 import re
 import io
 import pydub
+import threading
 
 class AudioOutput:
     def __init__(self):
@@ -50,13 +51,14 @@ class AudioOutput:
             await asyncio.sleep(0.1)
 
     def text_to_speech(self, text):
-        if not text:
-            return
-        try:
-            # 注意：如果在多线程环境（如 GUI）下，这里可能需要不同的异步处理方式
-            asyncio.run(self._generate_and_play(text))
-        except Exception as e:
-            print(f">>> Edge-TTS 播放失败: {e}")
+            if not text:
+                return
+            # 创建一个新线程来运行异步播放任务，避免阻塞主线程
+            play_thread = threading.Thread(
+                target=lambda: asyncio.run(self._generate_and_play(text)),
+                daemon=True
+            )
+            play_thread.start()
 
     def stop(self):
         self._is_stopping = True

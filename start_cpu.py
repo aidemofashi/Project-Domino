@@ -43,7 +43,7 @@ VIEW_LLM_CONFIG = {
 
 AUDIO_INPUT_FILE = "output_full.json"
 CHAT_FILE = "chat.json" 
-SILENCE_TIMEOUT = 15  # 10秒没声音就触发
+SILENCE_TIMEOUT = 25  # 10秒没声音就触发
 
 # --- 初始化 ---
 def initialize():
@@ -72,17 +72,18 @@ def save_history(chat):
     with open(CHAT_FILE, 'w', encoding='utf-8') as f:
         json.dump(chat, f, ensure_ascii=False, indent=4)
 
-def vosk_worker(res_queue):
-    """专门负责运行 Vosk VAD 获取音频数据，然后交给 ASR 识别"""
+def vosk_worker(res_queue, audio_output):
     while True:
-        # record() 返回音频数据数组
-        audio_data = AudioInput.record() 
+        # 这里把 audio_output 传进去，VAD 内部就能直接控制打断
+        audio_data = AudioInput.record(audio_output=audio_output) 
         if audio_data is not None and len(audio_data) > 0:
             res_queue.put(audio_data)
+
 
 # --- 主程序逻辑 ---
 def main():
     ASR.set(ASR_SETTING)
+    filter = Filter()
     llm_input, audio_output, view = initialize()
     timer = TimerTrigger()
     
@@ -98,11 +99,10 @@ def main():
     keyboard.wait('space')
     
     # 启动后台 Vosk 线程
-    t = threading.Thread(target=vosk_worker, args=(res_queue,), daemon=True)
+    t = threading.Thread(target=vosk_worker, args=(res_queue, audio_output), daemon=True)
     t.start()
-    
     print("\n>>> 系统启动！请直接说话...")
-    
+
     while True:
         try:
             # if keyboard.is_pressed("esc"):
@@ -111,14 +111,18 @@ def main():
             # 从队列获取结果
             try:
                 user_text = ASR.audio_input(input_audio_data=res_queue.get(timeout=0.1), lang="auto")
-                
+
                 date_time = time.strftime("%Y-%m-%d %H:%M:%S")
                 print(f"[{date_time}] 用户: {user_text}")
 
                 # 过滤与对话处理
                 chat = load_history()
-                
-                if Filter.emo(user_text) != False:
+                print(user_text)
+                if user_text:
+                    # 核心修复：从列表中提取第一个元素的 'text' 字段
+                    filtertext = user_text[0]['text'] 
+                    
+                if filter.emo(filtertext):
                     image = shot_screen()
                     see = view.llm_view(image_path="shot.png")
                     chat.append({
@@ -133,14 +137,12 @@ def main():
                     if response:
                         print("说话中...")
                         audio_output.text_to_speech(response)
-
                         chat.append({
                             "role": "assistant", 
                             "content": response, 
                             "time": date_time
                         })
                         save_history(chat)
-                        # 有用户输入，标记活动
                         timer.mark_activity()
                 else:
                     print(">>> 消息被 Filter 过滤。")
