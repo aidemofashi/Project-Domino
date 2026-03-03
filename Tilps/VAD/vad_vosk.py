@@ -21,7 +21,7 @@ class AudioInput:
     def record(cls, audio_output=None): # 仅在此处增加参数接收，用于打断
         cls._init_vosk()
         cls._rec.Reset()
-        MAX_SILENCE_BLOCKS = 10
+        MAX_SILENCE_BLOCKS = 6
         silence_counter = 0
 
         # 环形缓冲区，用于保存说话前 1.5 秒的音频
