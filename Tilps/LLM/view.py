@@ -93,7 +93,7 @@ class viewllm_input:
             response = self.llm.send_llm(messages)
             
             print("\n模型回答：")
-            return response
+            return response,image_data_url
             
         except Exception as e:
             error_msg = f"API调用失败: {e}"

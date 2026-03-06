@@ -12,54 +12,88 @@ class AudioOutput:
         print(">>> 初始化 Edge-TTS 输出...")
         self.voice = "zh-CN-XiaoxiaoNeural"
         self.rate = "+10%"
-        # 标记是否需要停止播放
         self._is_stopping = False 
-        print(f">>> 当前使用 Edge-TTS 音色: {self.voice}")
+        print(f">>> 当前使用 Edge-TTS 音色：{self.voice}")
 
     @staticmethod
     def input_api(api):
         pass
 
     async def _generate_and_play(self, text):
-        self._is_stopping = False  # 开始前重置停止状态
-        # 清洗文本
+        self._is_stopping = False
         text = re.sub(r'[\(\uff08].*?[\)\uff09]', '', text)
         text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9，。！？]', '', text)
-        communicate = edge_tts.Communicate(text, self.voice, rate=self.rate)
-        audio_data = b""
-        async for chunk in communicate.stream():
-            # 如果在获取流的过程中点击了停止，直接退出
-            if self._is_stopping:
-                return
-            if chunk["type"] == "audio":
-                audio_data += chunk["data"]
+        section = text.split(',')
+        
+        audio_datas = []
+        lock = threading.Lock()
+        
+        async def get_data(index, content):
+            try:
+                communicate = edge_tts.Communicate(content, self.voice, rate=self.rate)
+                audio_data = b""
 
-        if not audio_data or self._is_stopping:
+                # 使用 async for 来迭代异步生成器
+                async for chunk in communicate.stream():
+                    if self._is_stopping:
+                        return
+                    if chunk["type"] == "audio":
+                        audio_data += chunk["data"]
+
+                if not audio_data or self._is_stopping:
+                    return
+                
+                with lock:
+                    audio_datas.append((index, audio_data))
+            except Exception as e:
+                print(f"获取音频数据失败：{e}")
+
+        # 创建异步任务
+        tasks = []
+        for idx, content in enumerate(section):
+            task = asyncio.create_task(get_data(idx, content))
+            tasks.append(task)
+        
+        # 等待所有任务完成
+        await asyncio.gather(*tasks)
+        
+        if self._is_stopping:
             return
-
-        # 转换音频
-        audio_segment = pydub.AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
-        samples = np.array(audio_segment.get_array_of_samples()).astype(np.float32)
-        samples /= (2**15) 
-        # 播放
-        sd.play(samples, samplerate=audio_segment.frame_rate)
-        # 使用循环检查来模拟非阻塞等待，这样可以在播放途中响应 stop()
-        while sd.get_stream().active:
+        
+        audio_datas.sort(key=lambda x: x[0])
+        
+        for _, audio_data in audio_datas:
             if self._is_stopping:
-                sd.stop()
                 break
-            await asyncio.sleep(0.1)
+            audio_segment = pydub.AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
+            samples = np.array(audio_segment.get_array_of_samples()).astype(np.float32)
+            samples /= (2**15) 
+            sd.play(samples, samplerate=audio_segment.frame_rate)
+            while sd.get_stream().active:
+                if self._is_stopping:
+                    sd.stop()
+                    break
+                await asyncio.sleep(0.1)
 
     def text_to_speech(self, text):
-            if not text:
-                return
-            # 创建一个新线程来运行异步播放任务，避免阻塞主线程
-            play_thread = threading.Thread(
-                target=lambda: asyncio.run(self._generate_and_play(text)),
-                daemon=True
-            )
-            play_thread.start()
+        if not text:
+            return
+        # 使用 asyncio.run_coroutine_threadsafe 来在事件循环中运行协程
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # 如果没有运行中的事件循环，创建一个新的事件循环
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        # 在新线程中运行事件循环
+        def run_async():
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self._generate_and_play(text))
+        
+        play_thread = threading.Thread(target=run_async, daemon=True)
+        play_thread.start()
 
     def stop(self):
         self._is_stopping = True
-        sd.stop()  # 立即停止声卡输出
+        sd.stop()
