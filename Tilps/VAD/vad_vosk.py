@@ -21,11 +21,11 @@ class AudioInput:
     def record(cls, audio_output=None): # 仅在此处增加参数接收，用于打断
         cls._init_vosk()
         cls._rec.Reset()
-        MAX_SILENCE_BLOCKS = 2
+        MAX_SILENCE_BLOCKS = 1
         silence_counter = 0
 
         # 环形缓冲区，用于保存说话前 1.5 秒的音频
-        pre_roll_len = int(1.5 * cls.fs / 2000)
+        pre_roll_len = int(1.0 * cls.fs / 2000)
         ring_buffer = collections.deque(maxlen=pre_roll_len)
         
         recording = []
