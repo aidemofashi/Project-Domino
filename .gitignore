@@ -8,5 +8,6 @@ CharacterModels/
 ./Tilps/TTS/models/feibi/
 ./Tilps/TTS/reference/
 shot.png
-shot.json
-chat.json
+/Data/shot.json
+/Data/chat.json
+/Data/memorise.json

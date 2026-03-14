@@ -2,10 +2,10 @@ import json
 import os
 import time
 from Tilps.LLM.llm_input import LLMinput
-CHAT_FILE = "./chat.json" 
-SHOT_FILE = "./shot.json"
-MEMORY_FILE = "./memorise.json"
-CHARACTER_SETTING = "./character.json"
+CHAT_FILE = "./Data/chat.json" 
+SHOT_FILE = "./Data/shot.json"
+MEMORY_FILE = "./Data/memorise.json"
+CHARACTER_SETTING = "./Data/character.json"
 PROMOTE = ""
 LLM_CONFIG = {
     "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
