@@ -6,6 +6,18 @@ class LLMinput:
         openai.api_key = api_key
         self.model_name = model_name
 
+    def send_llm(self,messages):
+        response = openai.ChatCompletion.create(
+            model=self.model_name,
+            messages=messages,
+            temperature=0.6,
+            max_tokens=1500,
+            stream=False,
+        )
+        if response and response.choices:
+            return response.choices[0].message.content
+        return ""
+
     def send_llm_stream(self, messages):
         """流式发送请求，按标点符号切割并立即返回片段"""
         response = openai.ChatCompletion.create(
@@ -14,8 +26,8 @@ class LLMinput:
             temperature=0.6,
             max_tokens=500,
             stream=True, # 必须开启流式
-        )
-
+            )
+        
         buffer = ""
         # 遇到这些符号就切分，确保 TTS 尽快开始
         delimiters = ["，", "。", "！", "？", "；", "\n"]

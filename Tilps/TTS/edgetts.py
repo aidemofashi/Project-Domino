@@ -13,9 +13,9 @@ class AudioOutput:
         """
         max_workers: 并发合成的工作线程数（Edge TTS 并发数不宜过多，建议 2-3）
         """
-        print(f">>> 初始化 Edge-TTS 输出（并发合成，顺序播放），工作线程数={max_workers}...")
+        print(f">>> 初始化 Edge-TTS,工作线程数={max_workers}...")
         self.voice = "zh-CN-XiaoxiaoNeural"
-        self.rate = "+10%"
+        self.rate = "+15%"
         self.max_workers = max_workers
 
         # 播放队列存放按序号排序后的 PCM 数据（已保证顺序）

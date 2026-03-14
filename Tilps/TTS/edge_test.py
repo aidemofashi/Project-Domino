@@ -1,7 +1,7 @@
 import time
-from edgetts import AudioOutput
+from Tilps.TTS.edgetts import AudioOutput
 
-def main():
+def tts_test():
     print("开始测试 TTS 流式播放...")
     tts = AudioOutput()
     # 播放一段较长的文本，以便观察流式效果

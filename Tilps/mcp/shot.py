@@ -7,7 +7,7 @@ import io
 
 def shot_screen():
     """
-    截图并返回base64编码的图片数据
+    截图并使用WebP格式压缩
     """
     # 获取当前文件所在目录
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -28,13 +28,22 @@ def shot_screen():
     if max(img.size) > 1024:
         img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
     
-    # 转RGB（如果是PNG）
-    if img.mode == 'RGBA':
-        img = img.convert('RGB')
-    
-    # 保存到内存并编码
+    # 保存为WebP格式（比JPEG小30%左右）
     output = io.BytesIO()
-    img.save(output, format='JPEG', quality=85, optimize=True)
+    
+    # WebP参数优化
+    # quality: 0-100，建议75-85之间
+    # method: 0-6，值越大压缩越慢但效果越好
+    img.save(output, 
+             format='WebP', 
+             quality=65,      # 适当降低质量
+             method=6,        # 最大压缩率
+             lossless=False)  # 使用有损压缩
+    
     base64_data = base64.b64encode(output.getvalue()).decode("utf-8")
+    
+    # 清理临时文件
+    if os.path.exists(shot_path):
+        os.remove(shot_path)
     
     return base64_data

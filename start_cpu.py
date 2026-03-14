@@ -14,6 +14,8 @@ from Tilps.ASR.asr import ASR
 from Tilps.VAD.vad_vosk import AudioInput 
 from Tilps.mcp.shot import shot_screen
 from Tilps.LLM.trigger import TimerTrigger
+from Tilps.TTS.edge_test import tts_test
+from Tilps.LLM.memorymanager import MemoryManager
 
 # --- 配置区域 ---
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "models/SenseVoiceSmall")
@@ -38,6 +40,7 @@ LLM_CONFIG = {
 CHAT_FILE = "chat.json" 
 SHOT_FILE = "shot.json"
 SILENCE_TIMEOUT = 60  # 静音触发阈值
+MAKE_MEMORY =  16
 
 # --- 初始化 ---
 def initialize():
@@ -47,26 +50,8 @@ def initialize():
     
     # 初始化最新的流式 AudioOutput
     audio_out = AudioOutput()
-    return llm, audio_out
-
-def load_history():
-    chat = []
-    shot = []
-    if os.path.exists(CHAT_FILE) and os.path.getsize(CHAT_FILE) > 0:
-        with open(CHAT_FILE, 'r', encoding='utf-8') as f:
-            chat = json.load(f)
-    if os.path.exists(SHOT_FILE) and os.path.getsize(SHOT_FILE) > 0:
-        with open(SHOT_FILE, 'r', encoding='utf-8') as f:
-            shot = json.load(f)
-    return chat, shot
-
-def save_history(chat):
-    with open(CHAT_FILE, 'w', encoding='utf-8') as f:
-        json.dump(chat, f, ensure_ascii=False, indent=4)
-
-def save_shot(image_data):
-    with open(SHOT_FILE, 'w', encoding='utf-8') as f:
-        json.dump(image_data, f, ensure_ascii=False, indent=4)
+    llm_memory=MemoryManager()
+    return llm, audio_out,llm_memory
 
 def vosk_worker(res_queue, audio_output):
     """后台 ASR 录制线程"""
@@ -80,27 +65,34 @@ def vosk_worker(res_queue, audio_output):
 def main():
     ASR.set(ASR_SETTING)
     filter = Filter()
-    llm_input, audio_output = initialize()
+    llm_input, audio_output,llm_memory = initialize()
     timer = TimerTrigger()
     
     res_queue = queue.Queue()
     
+    #tts_test()
+
     print("\n" + "="*30)
     print("双向流式模式已就绪 (LLM Stream + TTS Stream)")
     print("提示：按 [空格] 键开始，按 [Esc] 退出")
     print("="*30)
     
     keyboard.wait('space')
-    chat, shot = load_history()
-    # 消息列表用于发送给 LLM
-    messege = list(chat) 
-
+    
     t = threading.Thread(target=vosk_worker, args=(res_queue, audio_output), daemon=True)
     t.start()
     print("\n>>> 系统启动！")
 
+    chat = []
+    full_chat = llm_memory.chat_worker(chat=None)
+    messege = list(full_chat)  # 消息列表用于发送给 LLM
     while True:
         try:
+            if len(chat) >= MAKE_MEMORY:
+                full_chat = llm_memory.chat_worker(chat)
+                messege = list(full_chat)  # 消息列表用于发送给 LLM
+                chat = []
+
             # 1. 检查 ASR 识别结果
             try:
                 raw_audio = res_queue.get(timeout=0.05)
@@ -117,16 +109,16 @@ def main():
                         
                         image_data = shot_screen()
                         image_data_url = f"data:image/jpeg;base64,{image_data}"
-                        
+
                         # 构建上下文
-                        current_user_msg = {
+                        user_msg = {
                             "role": "user",
                             "content": [
                                 {"type": "image_url", "image_url": {"url": image_data_url}},
                                 {"type": "text", "text": filtertext}
                             ]
                         }
-                        messege.append(current_user_msg)
+                        messege.append(user_msg)
                         chat.append({"role": "user", "content": [{"type": "text", "text": filtertext}]})
 
                         print(">>> 助手思考中 (流式播报)...")
@@ -139,13 +131,10 @@ def main():
                             audio_output.text_to_speech(chunk_text, interrupt=is_first_chunk)
                             full_response += chunk_text
                             is_first_chunk = False # 仅第一段需要 interrupt 以清空旧缓存
-
                         # 记录回复
                         if full_response:
                             chat.append({"role": "assistant", "content": full_response, "time": date_time})
-                            shot.append({"shot": image_data_url, "time": date_time})
-                            save_history(chat)
-                            save_shot(shot)
+                            llm_memory.save_shot({"shot": image_data_url, "time": date_time})
                             timer.mark_activity()
                     else:
                         print(">>> 消息被过滤。")
@@ -178,7 +167,7 @@ def main():
 
                     if full_response:
                         chat.append({"role": "assistant", "content": full_response, "time": date_time})
-                        save_history(chat)
+                        llm_memory.save_shot({"shot": image_data_url, "time": date_time})
                     
                     timer.mark_trigger()
                     
