@@ -36,7 +36,7 @@ def shot_screen():
     # method: 0-6，值越大压缩越慢但效果越好
     img.save(output, 
              format='WebP', 
-             quality=65,      # 适当降低质量
+             quality=50,      # 适当降低质量
              method=6,        # 最大压缩率
              lossless=False)  # 使用有损压缩
     

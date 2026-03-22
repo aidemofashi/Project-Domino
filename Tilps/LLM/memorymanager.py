@@ -85,7 +85,7 @@ class MemoryManager:
             print(messages)
             return messages
 
-        send_messages = [{"role": "system","content": "你是记忆整理的专家，会根据输入的信息提出人物和事件，每次精简不超过50字。\n"},{"role":"user","content": json.dumps(chat, ensure_ascii=False)}]
+        send_messages = [{"role": "system","content": "你是记忆提取专家。从对话中提取关于用户的事实信息，按以下格式输出：\n\n【固定事实】\n- 身份信息：地域、职业/身份、语言能力等\n- 近期事件：正在做的事、重要日程、压力来源\n- 行为习惯：作息、偏好、常用工具/平台\n- 情绪状态：当前情绪、情绪变化趋势\n- 人际关系：提及的人/角色/群体\n\n【提取规则】\n1. 只提取“事实”，不添加推断和评价\n2. 如果同一信息在不同时间出现，只保留最新或最具体的版本\n3. 每条回忆控制在20字以内，用短横线列出\n4. 如果用户明确表达情绪（如“好累”“谢谢你”），一并记录\n5. 输出格式必须为严格的JSON，结构如下：\n{\n  \"summary\": [\"事实1\", \"事实2\", \"事实3\"],\n  \"tags\": [\"标签1\", \"标签2\", \"标签3\"]\n}\n\n注意：只输出JSON对象，不要输出任何其他文字、注释或Markdown标记。"},{"role":"user","content":json.dumps(chat, ensure_ascii=False)}]
         date_time = time.strftime("%Y-%m-%d %H:%M:%S")
 
         if chat:

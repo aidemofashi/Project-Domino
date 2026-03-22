@@ -9,7 +9,7 @@ import subprocess
 import time
 
 class AudioOutput:
-    def __init__(self, max_workers=3):
+    def __init__(self, max_workers=2):
         """
         max_workers: 并发合成的工作线程数（Edge TTS 并发数不宜过多，建议 2-3）
         """

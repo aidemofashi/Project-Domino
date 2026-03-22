@@ -9,7 +9,7 @@ import queue
 # 骨牌组件导入
 from Tilps.LLM.filter import Filter
 from Tilps.LLM.llm_input import LLMinput
-from Tilps.TTS.edgetts import AudioOutput  # 确保这里指向你最新的基于 FFmpeg 的版本
+from Tilps.TTS.edgetts import AudioOutput  
 from Tilps.ASR.asr import ASR
 from Tilps.VAD.vad_vosk import AudioInput 
 from Tilps.mcp.shot import shot_screen
@@ -34,7 +34,7 @@ ASR_SETTING = {
 LLM_CONFIG = {
     "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "api_key": os.getenv("ALI_API"),
-    "model_name": "qwen-vl-max-latest"
+    "model_name": "qwen3.5-flash"
 }
 
 CHAT_FILE = "chat.json" 
@@ -70,7 +70,7 @@ def main():
     
     res_queue = queue.Queue()
     
-    #tts_test()
+    tts_test()
 
     print("\n" + "="*30)
     print("双向流式模式已就绪 (LLM Stream + TTS Stream)")
