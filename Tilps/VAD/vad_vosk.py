@@ -10,6 +10,7 @@ class AudioInput:
     MODEL_PATH = "./models/vosk-model-small-cn-0.22"
     _model = None
     _rec = None
+    interrupt_callback = None
 
     @classmethod
     def _init_vosk(cls):
@@ -18,13 +19,13 @@ class AudioInput:
             cls._rec = KaldiRecognizer(cls._model, cls.fs)
 
     @classmethod
-    def record(cls, audio_output=None): # 仅在此处增加参数接收，用于打断
+    def record(cls):
         cls._init_vosk()
         cls._rec.Reset()
         MAX_SILENCE_BLOCKS = 1
         silence_counter = 0
 
-        # 环形缓冲区，用于保存说话前 1.5 秒的音频
+        # 环形缓冲区，用来处理说话前预录制的音频数据块
         pre_roll_len = int(1.0 * cls.fs / 2000)
         ring_buffer = collections.deque(maxlen=pre_roll_len)
         
@@ -56,9 +57,8 @@ class AudioInput:
                 partial_text = partial.get("partial", "").strip()
                 
                 if partial_text:
-                    # 【核心修改点】：只要识别到初步文字，立即打断 TTS 播放
-                    if audio_output:
-                        audio_output.stop() 
+                    if cls.interrupt_callback:
+                        cls.interrupt_callback()
 
                     if not is_triggered:
                         # 检测到语音，开始录音

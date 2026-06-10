@@ -1,3 +1,3 @@
 venv\Scripts\activate
 
-python .\start_cpu.py
+$env:DEVICE="cpu"; python start.py

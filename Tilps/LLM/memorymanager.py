@@ -8,9 +8,9 @@ MEMORY_FILE = "./Data/memorise.json"
 CHARACTER_SETTING = "./Data/character.json"
 PROMOTE = ""
 LLM_CONFIG = {
-    "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    "api_key": os.getenv("ALI_API"),
-    "model_name": "qwen3-max"
+    "api_base": "https://api.vectorengine.ai/v1",
+    "api_key": os.getenv("V_API"),
+    "model_name": "gpt-4.1-mini-2025-04-14"
 }
 llm_send = LLMinput()
 llm_send.setting(LLM_CONFIG["api_base"], LLM_CONFIG["api_key"], LLM_CONFIG["model_name"])

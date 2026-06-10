@@ -5,8 +5,8 @@ import numpy as np
 import re
 import threading
 import queue
-import subprocess
 import time
+import miniaudio
 
 class AudioOutput:
     def __init__(self, max_workers=2):
@@ -102,50 +102,24 @@ class AudioOutput:
         if not text.strip():
             return None
 
-        # FFmpeg 命令
-        ffmpeg_cmd = [
-            'ffmpeg', '-i', 'pipe:0', '-f', 'f32le', '-ar', '24000', '-ac', '1', '-v', 'quiet', 'pipe:1'
-        ]
-        process = subprocess.Popen(
-            ffmpeg_cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL
-        )
-
-        # 收集所有 PCM 数据
-        pcm_chunks = []
-
-        def pull_pcm():
-            while True:
-                raw_data = process.stdout.read(4096)
-                if not raw_data:
+        # 收集 Edge TTS 返回的 MP3 数据
+        mp3_chunks = []
+        communicate = edge_tts.Communicate(text, self.voice, rate=self.rate)
+        async def run():
+            async for chunk in communicate.stream():
+                if self._stop_current.is_set():
                     break
-                samples = np.frombuffer(raw_data, dtype=np.float32)
-                pcm_chunks.append(samples)
+                if chunk["type"] == "audio":
+                    mp3_chunks.append(chunk["data"])
+        loop.run_until_complete(run())
 
-        pull_thread = threading.Thread(target=pull_pcm, daemon=True)
-        pull_thread.start()
+        if not mp3_chunks:
+            return None
 
-        try:
-            communicate = edge_tts.Communicate(text, self.voice, rate=self.rate)
-            async def run():
-                async for chunk in communicate.stream():
-                    if self._stop_current.is_set():
-                        break
-                    if chunk["type"] == "audio":
-                        process.stdin.write(chunk["data"])
-                        process.stdin.flush()
-            loop.run_until_complete(run())
-        finally:
-            if process.stdin:
-                process.stdin.close()
-            pull_thread.join()
-            process.wait()
-
-        if pcm_chunks:
-            return np.concatenate(pcm_chunks)
-        return None
+        # 用 miniaudio 解码 MP3 为 float32 PCM
+        mp3_data = b"".join(mp3_chunks)
+        decoded = miniaudio.decode(mp3_data, output_format=miniaudio.SampleFormat.FLOAT32, nchannels=1, sample_rate=24000)
+        return np.frombuffer(decoded.samples, dtype=np.float32)
 
     def _try_play(self):
         """检查缓冲区，将可连续播放的音频按顺序放入播放队列"""
