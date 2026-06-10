@@ -17,7 +17,8 @@ class RequestCore:
         self.silence_timeout = 60
         self.make_memory = 16
         self._running = False
-
+    
+    #注册功能
     def register(self, name, module):
         self.modules[name] = module
 

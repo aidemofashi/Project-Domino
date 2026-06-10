@@ -1,67 +1,31 @@
 import os
 
+from Tilps.Core.apim import ApiManager
 from Tilps.ASR.asr import ASR
-from Tilps.LLM.llm_input import LLMinput
 from Tilps.LLM.filter import Filter
 from Tilps.LLM.memorymanager import MemoryManager
 from Tilps.TTS.edgetts import AudioOutput
-from Tilps.TTS.edge_test import tts_test
 from Tilps.mcp.shot import shot_screen
 from Tilps.Core.core import RequestCore
 
 
 DEVICE = os.getenv("DEVICE", "cpu")
 
-if DEVICE == "cuda":
-    MODEL_DIR = os.path.join(os.path.dirname(__file__), "models/SenseVoiceSmall")
-    ASR_SETTING = {
-        "model": MODEL_DIR,
-        "vad_model": None,
-        "device": "cuda",
-        "disable_pbar": True,
-        "disable_update": True,
-        "local_files_only": True,
-        "batch_size": 1,
-        "max_single_segment_length": 20000,
-    }
-    LLM_CONFIG = {
-        "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "api_key": os.getenv("ALI_API"),
-        "model_name": "qwen3.5-flash",
-    }
-else:
-    MODEL_DIR = os.path.join(os.path.dirname(__file__), "models/SenseVoiceSmall")
-    ASR_SETTING = {
-        "model": MODEL_DIR,
-        "vad_model": None,
-        "device": "cpu",
-        "disable_pbar": True,
-        "disable_update": True,
-        "local_files_only": True,
-        "batch_size": 1,
-        "max_single_segment_length": 20000,
-    }
-    LLM_CONFIG = {
-        "api_base": "https://api.vectorengine.ai/v1",
-        "api_key": os.getenv("V_API"),
-        "model_name": "grok-4.1-fast",
-    }
-
-SILENCE_TIMEOUT = 60
-MAKE_MEMORY = 16
-
 
 def main():
-    ASR.set(ASR_SETTING)
+    api = ApiManager()
 
-    llm = LLMinput()
-    llm.setting(LLM_CONFIG["api_base"], LLM_CONFIG["api_key"], LLM_CONFIG["model_name"])
+    # ASR
+    asr_config = api.get_asr_config(DEVICE)
+    ASR.set(asr_config)
+
+    # LLM（根据设备选择配置）
+    profile = "main_cuda" if DEVICE == "cuda" else "main"
+    llm = api.create_llm(profile)
 
     tts = AudioOutput()
     memory = MemoryManager()
     filter = Filter()
-
-    #tts_test()
 
     core = RequestCore()
     core.register("asr", ASR)
@@ -70,8 +34,10 @@ def main():
     core.register("filter", filter)
     core.register("memory", memory)
     core.register("shot", shot_screen)
-    core.silence_timeout = SILENCE_TIMEOUT
-    core.make_memory = MAKE_MEMORY
+
+    sys_cfg = api.get_system_config()
+    core.silence_timeout = sys_cfg["silence_timeout"]
+    core.make_memory = sys_cfg["make_memory"]
 
     try:
         core.run()
