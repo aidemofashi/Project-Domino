@@ -3,13 +3,14 @@ numpy>=1.21.0
 soundfile
 pydub
 miniaudio
+torch
+torchaudio
 
-funasr>=1.0.0
+funasr
 vosk
 
 edge-tts
 dashscope>=1.15.0
-genie-tts
 
 openai>=0.28.0,<1.0.0
 

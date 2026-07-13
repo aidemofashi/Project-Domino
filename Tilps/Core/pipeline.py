@@ -45,6 +45,8 @@ class Pipeline:
         image_data = shot()
         image_data_url = f"data:image/jpeg;base64,{image_data}"
 
+        self._strip_old_images()
+
         user_msg = {
             "role": "user",
             "content": [
@@ -68,6 +70,7 @@ class Pipeline:
             }
             self.chat.append(chat_entry)
             memory.save_shot({"shot": image_data_url, "time": date_time})
+            self.state.resume_auto_trigger()
         self.state.mark_activity()
         self._compact_memory(memory)
         return True
@@ -79,16 +82,25 @@ class Pipeline:
         image_data = shot()
         image_data_url = f"data:image/jpeg;base64,{image_data}"
 
+        self._strip_old_images()
+
         prompt_msg = {
             "role": "user",
             "content": [
                 {"type": "image_url", "image_url": {"url": image_data_url}},
-                {"type": "text", "text": "主人没有说话"},
+                {"type": "text", "text": "瞧"},
             ],
         }
         self.messages.append(prompt_msg)
 
-        self._stream_and_speak(llm, tts)
+        try:
+            self._stream_and_speak(llm, tts)
+        except Exception as e:
+            print(f"\n[LLM错误] 自主提问失败: {e}")
+            self.messages.pop()
+            self.state.pause_auto_trigger()
+            self.state.mark_trigger()
+            return True
 
         if self._last_full_response:
             self.chat.append(
@@ -99,10 +111,20 @@ class Pipeline:
                 }
             )
             memory.save_shot({"shot": image_data_url, "time": date_time})
+            self.state.resume_auto_trigger()
+        else:
+            print("\n[主动触发] LLM返回为空，暂停自主提问")
+            self.messages.pop()
+            self.state.pause_auto_trigger()
 
         self.state.mark_trigger()
         self._compact_memory(memory)
         return True
+
+    def _strip_old_images(self):
+        for msg in self.messages:
+            if msg["role"] == "user" and isinstance(msg["content"], list):
+                msg["content"] = [item for item in msg["content"] if item["type"] != "image_url"]
 
     def _stream_and_speak(self, llm, tts):
         self._last_full_response = ""

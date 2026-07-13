@@ -70,8 +70,10 @@ class MemoryManager:
             character = self.load_character_setting()
             memory = self.load_memorise()
             messages = []
-            if character:
-                messages.extend(character)
+            for entry in character:
+                if entry.get("use") == "character":
+                    messages.append({"role": entry.get("role", "system"), "content": entry.get("content", "")})
+                    break
             if memory:
                 messages.append({
                     "role": "system",
@@ -82,8 +84,14 @@ class MemoryManager:
             print(messages)
             return messages
 
+        memory_prompt = {"role": "system", "content": "你是记忆提取专家。从对话中提取关于用户的信息，并且将每一条对话总结成对应每一条不超过10个字的回忆。注意：只输出纯文字，不要输出任何其他非普通书写文本格式注释的标记。"}
+        character = self.load_character_setting()
+        for entry in character:
+            if entry.get("use") == "memory":
+                memory_prompt = {"role": entry.get("role", "system"), "content": entry.get("content", memory_prompt["content"])}
+                break
         send_messages = [
-            {"role": "system", "content": "你是记忆提取专家。从对话中提取关于用户的信息，并且将每一条对话总结成对应每一条不超过10个字的回忆。注意：只输出纯文字，不要输出任何其他非普通书写文本格式注释的标记。"},
+            memory_prompt,
             {"role": "user", "content": json.dumps(chat, ensure_ascii=False)}
         ]
         date_time = time.strftime("%Y-%m-%d %H:%M:%S")
