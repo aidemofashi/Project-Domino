@@ -6,6 +6,7 @@ import keyboard
 from Tilps.Core.request import Request, RequestType, Priority
 from Tilps.Core.state import AppState, StateManager
 from Tilps.Core.pipeline import Pipeline
+from Tilps.Core.ws_server import WebSocketServer
 from Tilps.ASR.asr import ASR
 
 
@@ -22,6 +23,9 @@ class RequestCore:
         self._llm_busy = False
         self._memory_lock = threading.Lock()
         self._compacting = False
+        self.ws_server = WebSocketServer()
+        self.ws_server.set_on_user_text(self._on_ws_text)
+        self.ws_server.start()
 
     def register(self, name, module):
         self.modules[name] = module
@@ -40,6 +44,16 @@ class RequestCore:
         if "tts" in self.modules:
             self.modules["tts"].stop()
 
+    def _on_ws_text(self, text):
+        if text.strip():
+            self.emit(
+                Request(
+                    type=RequestType.VOICE_INPUT,
+                    payload={"text": text},
+                    priority=Priority.HIGH,
+                )
+            )
+
     def _on_asr_result(self, text):
         filter = self.modules.get("filter")
         if filter and not filter.emo(text):
@@ -47,6 +61,7 @@ class RequestCore:
             self.state.mark_activity()
             return
 
+        self.ws_server.send_user(text)
         self.emit(
             Request(
                 type=RequestType.VOICE_INPUT,
@@ -83,6 +98,7 @@ class RequestCore:
         messages.append(user_msg)
 
         print(">>> 助手思考中 (流式播报)...")
+        self.ws_server.send_status("助手思考中")
         full_response = ""
 
         self._llm_busy = True
@@ -91,6 +107,7 @@ class RequestCore:
             if self.state.consume_interrupt():
                 tts.stop()
                 print("\n>>> 被语音打断")
+                self.ws_server.send_status("被语音打断")
                 self._llm_busy = False
                 return
 
@@ -102,6 +119,7 @@ class RequestCore:
         self._llm_busy = False
 
         if full_response:
+            self.ws_server.send_domino(full_response)
             self._append_chat({
                 "role": "user",
                 "content": text,
@@ -146,6 +164,7 @@ class RequestCore:
 
     def _process_timer_request(self):
         print("\n[主动触发] 静音已达阈值")
+        self.ws_server.send_status("多咪主动触发对话")
         llm = self.modules["llm"]
         tts = self.modules["tts"]
         shot = self.modules["shot"]
@@ -192,6 +211,7 @@ class RequestCore:
 
         if full_response:
             date_time = time.strftime("%Y-%m-%d %H:%M:%S")
+            self.ws_server.send_domino(full_response)
             self._append_chat({
                 "role": "user",
                 "content": "瞧",
@@ -264,6 +284,7 @@ class RequestCore:
 
     def shutdown(self):
         self._running = False
+        self.ws_server.shutdown()
         if "asr" in self.modules:
             self.modules["asr"].stop_streaming()
         if "tts" in self.modules:

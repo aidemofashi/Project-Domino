@@ -14,6 +14,7 @@ DEVICE = os.getenv("DEVICE", "cpu")
 
 def main():
     api = ApiManager()
+    core = RequestCore()
 
     asr_config = api.get_asr_config(DEVICE)
     ASR.set(asr_config)
@@ -25,7 +26,6 @@ def main():
     memory = MemoryManager()
     filter = Filter()
 
-    core = RequestCore()
     core.register("asr", ASR)
     core.register("llm", llm)
     core.register("tts", tts)
