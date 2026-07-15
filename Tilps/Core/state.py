@@ -9,6 +9,12 @@ class AppState(Enum):
     RECORDING = "recording"
 
 
+class TTSState(Enum):
+    IDLE = "idle"
+    SYNTHESIZING = "synthesizing"
+    PLAYING = "playing"
+
+
 class StateManager:
     def __init__(self):
         self._state = AppState.IDLE
@@ -18,6 +24,7 @@ class StateManager:
         self.last_activity_time = time.time()
         self.last_trigger_time = time.time()
         self._auto_trigger_paused = False
+        self._auto_trigger_count = 0
 
     def get_state(self):
         with self._lock:
@@ -39,21 +46,23 @@ class StateManager:
     def mark_activity(self):
         self.last_activity_time = time.time()
         self.last_trigger_time = time.time()
+        self._auto_trigger_count = 0
 
     def pause_auto_trigger(self):
         self._auto_trigger_paused = True
-        print("[状态] 自主提问已暂停，等待语音交互恢复")
 
     def resume_auto_trigger(self):
         if self._auto_trigger_paused:
             self._auto_trigger_paused = False
-            print("[状态] 自主提问已恢复")
 
     def mark_trigger(self):
         self.last_trigger_time = time.time()
+        self._auto_trigger_count += 1
 
-    def should_trigger(self, silence_timeout):
+    def should_trigger(self, silence_timeout, max_triggers=2):
         if self._auto_trigger_paused:
+            return False
+        if self._auto_trigger_count >= max_triggers:
             return False
         now = time.time()
         return (now - self.last_activity_time > silence_timeout and

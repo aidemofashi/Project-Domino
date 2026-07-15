@@ -8,190 +8,140 @@ import queue
 import time
 import miniaudio
 
+
+class TTSState:
+    IDLE = "idle"
+    SYNTHESIZING = "synthesizing"
+    PLAYING = "playing"
+
+
 class AudioOutput:
     def __init__(self, max_workers=2):
-        """
-        max_workers: 并发合成的工作线程数（Edge TTS 并发数不宜过多，建议 2-3）
-        """
-        print(f">>> 初始化 Edge-TTS,工作线程数={max_workers}...")
+        print(f">>> Edge-TTS, workers={max_workers}")
         self.voice = "zh-CN-XiaoxiaoNeural"
         self.rate = "+15%"
         self.max_workers = max_workers
 
-        # 播放队列存放按序号排序后的 PCM 数据（已保证顺序）
-        self.play_queue = queue.Queue()
-        # 原始任务队列（文本 + 序号）
-        self.task_queue = queue.Queue()
-        # 结果缓冲区：暂存已合成但未到播放顺序的音频数据 {序号: audio_data}
-        self.result_buffer = {}
-        self.buffer_lock = threading.Lock()
-        # 下一个期望播放的序号
-        self.next_seq = 0
-        self.seq_lock = threading.Lock()
+        self._state = TTSState.IDLE
+        self._state_lock = threading.Lock()
 
-        # 用于停止当前正在执行的任务（新对话打断）
-        self._stop_current = threading.Event()
-        self._synthesis_stop = threading.Event()  # 全局停止信号
+        self._sentence_queue = queue.Queue()
+        self._current_sentence_event = threading.Event()
+        self._current_sentence_event.set()
 
-        # 启动播放线程
-        self._play_thread = threading.Thread(target=self._play_worker, daemon=True)
+        self._stop_event = threading.Event()
+        self._synthesis_stop = threading.Event()
+
+        self._play_thread = threading.Thread(target=self._play_sequencer, daemon=True)
         self._play_thread.start()
 
-        # 启动合成工作线程池
         self._workers = []
         for i in range(self.max_workers):
             t = threading.Thread(target=self._synthesis_worker, daemon=True)
             t.start()
             self._workers.append(t)
 
-    def _play_worker(self):
-        """从播放队列取数据并推送到扬声器"""
-        samplerate = 24000
-        stream = sd.OutputStream(samplerate=samplerate, channels=1, dtype='float32')
-        stream.start()
+    @property
+    def state(self):
+        with self._state_lock:
+            return self._state
 
-        while not self._synthesis_stop.is_set():
-            try:
-                item = self.play_queue.get(timeout=0.1)
-            except queue.Empty:
-                continue
-
-            if item is None:  # 退出信号
-                break
-
-            if isinstance(item, str) and item == "STOP_RESET":
-                stream.stop()
-                stream.start()
-                continue
-
-            # 写入音频数据 (n_samples, 1)
-            stream.write(item.reshape(-1, 1))
+    def _set_state(self, s):
+        with self._state_lock:
+            self._state = s
 
     def _synthesis_worker(self):
-        """工作线程：从任务队列取任务，合成音频，将结果放入缓冲区"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
         while not self._synthesis_stop.is_set():
             try:
-                seq, text = self.task_queue.get(timeout=0.5)
+                seq, text = self._sentence_queue.get(timeout=0.5)
             except queue.Empty:
                 continue
 
-            if text is None:  # 退出信号
+            if text is None:
                 break
 
-            # 检查是否被打断（新对话清空任务时可能设置此事件）
-            if self._stop_current.is_set():
+            if self._stop_event.is_set():
                 continue
 
-            # 合成音频，得到 PCM 数据（float32 数组）
             audio_data = self._synthesize(text, loop)
-            if audio_data is not None:
-                # 将合成结果放入缓冲区
-                with self.buffer_lock:
-                    self.result_buffer[seq] = audio_data
-                # 触发播放检查
-                self._try_play()
+            if audio_data is not None and not self._stop_event.is_set():
+                self._current_sentence_event.wait()
+                if not self._stop_event.is_set():
+                    self._current_sentence_event.clear()
+                    self._set_state(TTSState.PLAYING)
+                    sd.play(audio_data, samplerate=24000)
+                    sd.wait()
+                    self._current_sentence_event.set()
 
     def _synthesize(self, text, loop):
-        """实际合成逻辑，返回 numpy 数组 (float32)"""
-        # 预处理文本
         text = re.sub(r'[\(\uff08].*?[\)\uff09]', '', text)
-        text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9，。！？]', '', text)
+        text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9，。！？,.!?\n]', '', text)
         if not text.strip():
             return None
 
-        # 收集 Edge TTS 返回的 MP3 数据
         mp3_chunks = []
         communicate = edge_tts.Communicate(text, self.voice, rate=self.rate)
         async def run():
             async for chunk in communicate.stream():
-                if self._stop_current.is_set():
+                if self._stop_event.is_set():
                     break
                 if chunk["type"] == "audio":
                     mp3_chunks.append(chunk["data"])
-        loop.run_until_complete(run())
+        try:
+            loop.run_until_complete(run())
+        except Exception as e:
+            print(f"[TTS] Synthesis error: {e}")
+            return None
 
         if not mp3_chunks:
             return None
 
-        # 用 miniaudio 解码 MP3 为 float32 PCM
         mp3_data = b"".join(mp3_chunks)
-        decoded = miniaudio.decode(mp3_data, output_format=miniaudio.SampleFormat.FLOAT32, nchannels=1, sample_rate=24000)
+        decoded = miniaudio.decode(
+            mp3_data, output_format=miniaudio.SampleFormat.FLOAT32,
+            nchannels=1, sample_rate=24000
+        )
         return np.frombuffer(decoded.samples, dtype=np.float32)
 
-    def _try_play(self):
-        """检查缓冲区，将可连续播放的音频按顺序放入播放队列"""
-        with self.buffer_lock:
-            while True:
-                if self.next_seq in self.result_buffer:
-                    audio = self.result_buffer.pop(self.next_seq)
-                    self.play_queue.put(audio)
-                    self.next_seq += 1
-                else:
-                    break
+    def _play_sequencer(self):
+        while not self._synthesis_stop.is_set():
+            self._current_sentence_event.wait()
+            if self._sentence_queue.empty() and not self._stop_event.is_set():
+                self._set_state(TTSState.IDLE)
+            time.sleep(0.1)
 
-    def text_to_speech(self, text, interrupt=False):
-        """
-        text: 文字片段
-        interrupt: 是否打断当前正在播放的旧对话（新对话的第一个片段设为 True）
-        """
+    def speak(self, text, interrupt=False):
         if interrupt:
-            # 停止当前所有合成任务
-            self._stop_current.set()
-            # 清空播放队列（停止当前播放）
             self.stop()
-            # 清空任务队列中尚未处理的任务
-            with self.buffer_lock:
-                self.result_buffer.clear()
-            with self.seq_lock:
-                self.next_seq = 0
-            # 清空任务队列
-            while not self.task_queue.empty():
-                try:
-                    self.task_queue.get_nowait()
-                except queue.Empty:
-                    break
-            # 重置停止标志
-            self._stop_current.clear()
 
-        # 分配序号（必须在锁内保证顺序）
-        with self.seq_lock:
-            seq = self.next_seq + len(self.result_buffer) + self.task_queue.qsize()
-            # 注意：这里分配的序号可能不是严格递增的，因为多个线程可能同时调用 text_to_speech？
-        # 但 LLM 流式输出是在主线程中顺序调用的，所以 seq 可以在主线程中生成，无需锁。
-        # 我们可以直接在 interrupt 处理时重置 next_seq，并在主线程中累加一个计数器。
-        # 为了简化，我们可以在类内部维护一个递增的计数器，仅在 interrupt 时重置。
-        # 但这里为了兼容并发调用（实际上主线程是串行调用），我们使用一个线程安全的计数器。
-        # 简化：使用 threading.Lock 保护 seq_counter
-        if not hasattr(self, '_seq_counter'):
-            self._seq_counter = 0
-            self._seq_counter_lock = threading.Lock()
+        self._set_state(TTSState.SYNTHESIZING)
 
-        with self._seq_counter_lock:
-            if interrupt:
-                self._seq_counter = 0
-            seq = self._seq_counter
-            self._seq_counter += 1
+        sentences = re.split(r'(?<=[。！？\n])', text)
+        sentences = [s.strip() for s in sentences if s.strip()]
 
-        self.task_queue.put((seq, text))
-
-        # 如果是第一个片段（seq == 0），可以立即触发播放检查（实际上已经有结果？但结果还没出来）
-        # 无需特殊处理，等合成完成会调用 _try_play
+        for sentence in sentences:
+            if self._stop_event.is_set():
+                break
+            self._sentence_queue.put((id(sentence), sentence))
 
     def stop(self):
-        """立即停止播放，并清空播放队列"""
+        self._stop_event.set()
         sd.stop()
-        while not self.play_queue.empty():
+        self._current_sentence_event.set()
+        while not self._sentence_queue.empty():
             try:
-                self.play_queue.get_nowait()
+                self._sentence_queue.get_nowait()
             except queue.Empty:
                 break
-        self.play_queue.put("STOP_RESET")
+        time.sleep(0.05)
+        self._stop_event.clear()
+        self._set_state(TTSState.IDLE)
 
     def shutdown(self):
-        """关闭所有线程"""
         self._synthesis_stop.set()
+        self.stop()
         for _ in self._workers:
-            self.task_queue.put((None, None))
+            self._sentence_queue.put((None, None))

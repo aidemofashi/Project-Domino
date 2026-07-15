@@ -15,11 +15,9 @@ DEVICE = os.getenv("DEVICE", "cpu")
 def main():
     api = ApiManager()
 
-    # ASR
     asr_config = api.get_asr_config(DEVICE)
     ASR.set(asr_config)
 
-    # LLM（根据设备选择配置）
     profile = "main_cuda" if DEVICE == "cuda" else "main"
     llm = api.create_llm(profile)
 
