@@ -32,6 +32,9 @@ class AudioOutput:
         self._stop_event = threading.Event()
         self._synthesis_stop = threading.Event()
 
+        self._generation = 0
+        self._gen_lock = threading.Lock()
+
         self._play_thread = threading.Thread(target=self._play_sequencer, daemon=True)
         self._play_thread.start()
 
@@ -50,13 +53,22 @@ class AudioOutput:
         with self._state_lock:
             self._state = s
 
+    def _next_gen(self):
+        with self._gen_lock:
+            self._generation += 1
+            return self._generation
+
+    def _current_gen(self):
+        with self._gen_lock:
+            return self._generation
+
     def _synthesis_worker(self):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
         while not self._synthesis_stop.is_set():
             try:
-                seq, text = self._sentence_queue.get(timeout=0.5)
+                seq, text, gen = self._sentence_queue.get(timeout=0.5)
             except queue.Empty:
                 continue
 
@@ -68,8 +80,10 @@ class AudioOutput:
 
             audio_data = self._synthesize(text, loop)
             if audio_data is not None and not self._stop_event.is_set():
+                if gen != self._current_gen():
+                    continue
                 self._current_sentence_event.wait()
-                if not self._stop_event.is_set():
+                if not self._stop_event.is_set() and gen == self._current_gen():
                     self._current_sentence_event.clear()
                     self._set_state(TTSState.PLAYING)
                     sd.play(audio_data, samplerate=24000)
@@ -116,7 +130,9 @@ class AudioOutput:
     def speak(self, text, interrupt=False):
         if interrupt:
             self.stop()
-
+            gen = self._next_gen()
+        else:
+            gen = self._current_gen()
         self._set_state(TTSState.SYNTHESIZING)
 
         sentences = re.split(r'(?<=[。！？\n])', text)
@@ -125,7 +141,7 @@ class AudioOutput:
         for sentence in sentences:
             if self._stop_event.is_set():
                 break
-            self._sentence_queue.put((id(sentence), sentence))
+            self._sentence_queue.put((id(sentence), sentence, gen))
 
     def stop(self):
         self._stop_event.set()
@@ -144,4 +160,4 @@ class AudioOutput:
         self._synthesis_stop.set()
         self.stop()
         for _ in self._workers:
-            self._sentence_queue.put((None, None))
+            self._sentence_queue.put((None, None, 0))

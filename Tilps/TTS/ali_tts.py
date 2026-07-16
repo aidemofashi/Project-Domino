@@ -4,82 +4,157 @@ import sounddevice as sd
 import numpy as np
 import re
 import threading
+import queue
 import time
 
-class AudioOutput:
-    """阿里云语音合成输出模块（稳定版，每次新建连接，同步合成）"""
 
-    _api_key = None  # 类变量，用于存储 API Key
+class TTSState:
+    IDLE = "idle"
+    SYNTHESIZING = "synthesizing"
+    PLAYING = "playing"
+
+
+class AudioOutput:
+    _api_key = None
 
     @classmethod
     def input_api(cls, api_key: str):
-        """类方法设置阿里云 API Key"""
         cls._api_key = api_key
         dashscope.api_key = api_key
-        print(">>> API Key 已设置")
 
-    def __init__(self):
-        print(">>> 初始化阿里云语音合成（稳定版）...")
+    def __init__(self, max_workers=2):
+        print(f">>> 阿里云TTS, workers={max_workers}")
         self.model = "cosyvoice-v1"
         self.voice = "longmiao"
         self.sample_rate = 24000
-        self._is_stopping = False
-        print(f">>> 当前使用音色 ID: {self.voice}，采样率: {self.sample_rate} Hz")
+        self.max_workers = max_workers
 
-    def _synthesize_and_play(self, text: str):
-        """
-        同步合成完整文本并播放（在子线程中运行）
-        """
-        self._is_stopping = False
+        self._state = TTSState.IDLE
+        self._state_lock = threading.Lock()
 
-        # 文本清洗：去除括号内的注释及特殊符号
+        self._sentence_queue = queue.Queue()
+        self._current_sentence_event = threading.Event()
+        self._current_sentence_event.set()
+
+        self._stop_event = threading.Event()
+        self._synthesis_stop = threading.Event()
+
+        self._generation = 0
+        self._gen_lock = threading.Lock()
+
+        self._play_thread = threading.Thread(target=self._play_sequencer, daemon=True)
+        self._play_thread.start()
+
+        self._workers = []
+        for i in range(self.max_workers):
+            t = threading.Thread(target=self._synthesis_worker, daemon=True)
+            t.start()
+            self._workers.append(t)
+
+    @property
+    def state(self):
+        with self._state_lock:
+            return self._state
+
+    def _set_state(self, s):
+        with self._state_lock:
+            self._state = s
+
+    def _next_gen(self):
+        with self._gen_lock:
+            self._generation += 1
+            return self._generation
+
+    def _current_gen(self):
+        with self._gen_lock:
+            return self._generation
+
+    def _synthesis_worker(self):
+        while not self._synthesis_stop.is_set():
+            try:
+                seq, text, gen = self._sentence_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+
+            if text is None:
+                break
+
+            if self._stop_event.is_set():
+                continue
+
+            audio_data = self._synthesize(text)
+            if audio_data is not None and not self._stop_event.is_set():
+                if gen != self._current_gen():
+                    continue
+                self._current_sentence_event.wait()
+                if not self._stop_event.is_set() and gen == self._current_gen():
+                    self._current_sentence_event.clear()
+                    self._set_state(TTSState.PLAYING)
+                    sd.play(audio_data, samplerate=self.sample_rate)
+                    sd.wait()
+                    self._current_sentence_event.set()
+
+    def _synthesize(self, text):
         text = re.sub(r'[\(\uff08].*?[\)\uff09]', '', text)
         text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9，。！？,.!?]', '', text)
-
-        if not text:
-            return
-
-        # 按句子分割，但这里我们一次合成整个文本（因为同步call不支持流式）
-        # 如果想分句播放，可以循环创建多个合成器，但会增加延迟
+        if not text.strip():
+            return None
+        if not self.__class__._api_key:
+            print(">>> 错误：未设置阿里云 API Key")
+            return None
         try:
-            # 每次新建合成器
             synthesizer = SpeechSynthesizer(
                 model=self.model,
                 voice=self.voice,
                 format=AudioFormat.PCM_24000HZ_MONO_16BIT
             )
-            print(f">>> 合成文本: {text[:30]}...")
-            audio_bytes = synthesizer.call(text)  # 同步合成
-
-            if self._is_stopping:
-                return
-
-            # 转换为 float32 并播放
+            audio_bytes = synthesizer.call(text)
+            if self._stop_event.is_set():
+                return None
             audio_data = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-            sd.play(audio_data, samplerate=self.sample_rate)
-            sd.wait()  # 等待播放完成
-            time.sleep(0.2)  # 避免过于紧凑
-
+            return audio_data
         except Exception as e:
-            print(f">>> 合成失败: {e}")
+            print(f"[TTS] 阿里云合成失败: {e}")
+            return None
 
-    def text_to_speech(self, text: str):
-        """
-        对外接口：将文本合成为语音并播放（在独立线程中执行）
-        """
-        if not text:
-            return
+    def _play_sequencer(self):
+        while not self._synthesis_stop.is_set():
+            self._current_sentence_event.wait()
+            if self._sentence_queue.empty() and not self._stop_event.is_set():
+                self._set_state(TTSState.IDLE)
+            time.sleep(0.1)
 
-        if not self.__class__._api_key:
-            print(">>> 错误：未设置 API Key，请先调用 AudioOutput.input_api()")
-            return
+    def speak(self, text, interrupt=False):
+        if interrupt:
+            self.stop()
+            gen = self._next_gen()
+        else:
+            gen = self._current_gen()
+        self._set_state(TTSState.SYNTHESIZING)
 
-        # 在新线程中执行合成与播放，避免阻塞主线程
-        play_thread = threading.Thread(target=self._synthesize_and_play, args=(text,), daemon=True)
-        play_thread.start()
+        sentences = re.split(r'(?<=[。！？\n])', text)
+        sentences = [s.strip() for s in sentences if s.strip()]
+
+        for sentence in sentences:
+            if self._stop_event.is_set():
+                break
+            self._sentence_queue.put((id(sentence), sentence, gen))
 
     def stop(self):
-        """停止当前播放"""
-        self._is_stopping = True
+        self._stop_event.set()
         sd.stop()
-        print(">>> 已停止合成与播放")
+        self._current_sentence_event.set()
+        while not self._sentence_queue.empty():
+            try:
+                self._sentence_queue.get_nowait()
+            except queue.Empty:
+                break
+        time.sleep(0.05)
+        self._stop_event.clear()
+        self._set_state(TTSState.IDLE)
+
+    def shutdown(self):
+        self._synthesis_stop.set()
+        self.stop()
+        for _ in self._workers:
+            self._sentence_queue.put((None, None, 0))

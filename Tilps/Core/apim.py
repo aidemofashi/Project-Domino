@@ -91,7 +91,11 @@ class ApiManager:
         elif engine == "ali":
             from Tilps.TTS.ali_tts import AudioOutput
             AudioOutput.input_api(self._resolve(cfg["ali"]["api_key"]))
-            return AudioOutput()
+            tts = AudioOutput()
+            ali_cfg = cfg.get("ali", {})
+            tts.voice = ali_cfg.get("voice", tts.voice)
+            tts.model = ali_cfg.get("model", tts.model)
+            return tts
         else:
             raise ValueError(f"不支持的 TTS 引擎: {engine}")
 

@@ -40,9 +40,6 @@ class RequestCore:
 
     def _on_vad_interrupt(self):
         self.state.set_state(AppState.RECORDING)
-        self.state.request_interrupt()
-        if "tts" in self.modules:
-            self.modules["tts"].stop()
 
     def _on_ws_text(self, text):
         if text.strip():

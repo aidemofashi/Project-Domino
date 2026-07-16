@@ -2,7 +2,7 @@
   "llm": {
     "main": {
       "api_base": "http://127.0.0.1:8888/v1",
-      "api_key": "env:V_API",
+      "api_key": "env:ALI_API",
       "model_name": "qwen/qwen3-vl-4b"
     },
     "main_cuda": {
@@ -12,7 +12,7 @@
     },
     "memory": {
       "api_base": "http://127.0.0.1:8888/v1",
-      "api_key": "env:V_API",
+      "api_key": "env:ALI_API",
       "model_name": "qwen/qwen3-vl-4b"
     }
   },
