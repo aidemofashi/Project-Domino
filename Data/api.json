@@ -1,0 +1,62 @@
+{
+  "llm": {
+    "main": {
+      "api_base": "http://127.0.0.1:8888/v1",
+      "api_key": "env:ALI_API",
+      "model_name": "qwen/qwen3-vl-4b"
+    },
+    "main_cuda": {
+      "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "api_key": "env:ALI_API",
+      "model_name": "qwen3.5-flash"
+    },
+    "memory": {
+      "api_base": "http://127.0.0.1:8888/v1",
+      "api_key": "env:ALI_API",
+      "model_name": "qwen/qwen3-vl-4b"
+    }
+  },
+  "asr": {
+    "input_device": null,
+    "model": "models/SenseVoiceSmall",
+    "vad_model": "fsmn-vad",
+    "device": "cpu",
+    "disable_pbar": true,
+    "disable_update": true,
+    "local_files_only": true,
+    "batch_size": 1,
+    "max_single_segment_length": 20000
+  },
+  "tts": {
+    "engine": "lux",
+    "edge": {
+      "voice": "zh-CN-XiaoxiaoNeural",
+      "rate": "+15%",
+      "max_workers": 3
+    },
+    "ali": {
+      "api_key": "env:ALI_API",
+      "model": "cosyvoice-v1",
+      "voice": "longmiao",
+      "sample_rate": 24000
+    },
+    "lux": {
+      "max_workers": 1,
+      "threads": 6,
+      "num_steps": 2
+    }
+  },
+  "vad": {
+    "model_path": "models/vosk-model-small-cn-0.22",
+    "sample_rate": 12000,
+    "max_silence_blocks": 1,
+    "max_duration": 30,
+    "pre_roll_seconds": 1.0
+  },
+  "system": {
+    "silence_timeout": 60,
+    "make_memory": 16,
+    "enable_ui": false,
+    "enable_ws": false
+  }
+}

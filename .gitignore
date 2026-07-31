@@ -5,9 +5,9 @@ models/
 .venv/
 GenieData/
 CharacterModels/
-./Tilps/TTS/models/feibi/
-./Tilps/TTS/reference/
+Tilps/TTS/models/
 shot.png
 /Data/shot.json
 /Data/chat.json
 /Data/memorise.json
+temp/
