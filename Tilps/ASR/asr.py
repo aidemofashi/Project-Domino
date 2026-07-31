@@ -39,24 +39,27 @@ class ASR:
                 self.vad_model = None
 
     def start_streaming(self, on_interrupt=None, on_result=None):
+        """流程启动前准备配置"""
         self._on_interrupt = on_interrupt
         self._on_result = on_result
         self._listening = True
         self._thread = threading.Thread(target=self._listen_loop, daemon=True)
         self._thread.start()
-        print("[ASR] Streaming started (FunASR VAD + SenseVoice)")
+        print("[ASR] 工作流已启动")
 
     def stop_streaming(self):
+        """ 停止监听循环 """
         self._listening = False
 
     def _listen_loop(self):
+        """主监听循环"""
         PRE_ROLL_SEC = 0.5
         MAX_SILENCE_BLOCKS = 8
         pre_roll_chunks = int(PRE_ROLL_SEC * self.fs / self.BLOCK_SIZE)
         ring_buffer = collections.deque(maxlen=pre_roll_chunks)
 
         while self._listening:
-            self._vad_cache = {}
+            self._vad_cache = {}  # 最好不要动，使用蓝牙耳机集成麦克风有时候会卡死，这个对问题有帮助  
             recording = []
             is_triggered = False
             silence_counter = 0
@@ -135,7 +138,7 @@ class ASR:
                 print(f"[ASR] Recognition error: {e}")
 
     def _detect_speech(self, indata):
-        """Returns (is_speech: bool, is_speech_end: bool)"""
+        """备选语音检测、在没有vad模型时使用"""
         if self.vad_model is not None:
             try:
                 result = self.vad_model.generate(
@@ -150,8 +153,8 @@ class ASR:
                             has_end = seg[1] >= 0
                             if has_speech or has_end:
                                 return has_speech, has_end
-            except Exception:
-                print(Exception)
+            except Exception as e:
+                print("VAD error: " + str(e))
                 pass
         energy = np.linalg.norm(indata) / np.sqrt(len(indata))
         return energy > 0.015, False
