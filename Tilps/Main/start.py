@@ -1,11 +1,12 @@
 import os
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 from Tilps.ASR.asr import ASR
 from Tilps.LLM.llm_input import LLMinput
 from Tilps.LLM.filter import Filter
 from Tilps.LLM.memorymanager import MemoryManager
-from Tilps.TTS.edgetts import AudioOutput
-from Tilps.TTS.edge_test import tts_test
+from Tilps.Core.apim import ApiManager
 from Tilps.mcp.shot import shot_screen
 from Tilps.Core.core import RequestCore
 
@@ -52,19 +53,19 @@ MAKE_MEMORY = 16
 
 
 def main():
-    ASR.set(ASR_SETTING)
+    asr = ASR()
+    asr.set(ASR_SETTING)
 
     llm = LLMinput()
     llm.setting(LLM_CONFIG["api_base"], LLM_CONFIG["api_key"], LLM_CONFIG["model_name"])
 
-    tts = AudioOutput()
+    api = ApiManager()
+    tts = api.create_tts()
     memory = MemoryManager()
     filter = Filter()
 
-    #tts_test()
-
     core = RequestCore()
-    core.register("asr", ASR)
+    core.register("asr", asr)
     core.register("llm", llm)
     core.register("tts", tts)
     core.register("filter", filter)

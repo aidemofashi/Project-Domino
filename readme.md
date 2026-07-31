@@ -1,6 +1,10 @@
 # PROJECT:Domino v0.1  
 
 ![logo](./domino-1.png)
+
+![blibili](http://i2.hdslb.com/bfs/archive/e01670158193db37251c4de5b004b6027e56b244.jpg@.avif)
+
+[![点我观看演示](https://img.shields.io/badge/点击观看-B站演示视频-00A1D6?style=for-the-badge&logo=bilibili)](https://www.bilibili.com/video/BV1RBKV6LEXP/)
 ## 项目描述  
 
 开发环境：  

@@ -1,10 +1,11 @@
 import os
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 from Tilps.Core.apim import ApiManager
 from Tilps.ASR.asr import ASR
 from Tilps.LLM.filter import Filter
 from Tilps.LLM.memorymanager import MemoryManager
-from Tilps.TTS.edgetts import AudioOutput
 from Tilps.mcp.shot import shot_screen
 from Tilps.Core.core import RequestCore
 
@@ -17,16 +18,17 @@ def main():
     core = RequestCore()
 
     asr_config = api.get_asr_config(DEVICE)
-    ASR.set(asr_config)
+    asr = ASR()
+    asr.set(asr_config)
 
     profile = "main_cuda" if DEVICE == "cuda" else "main"
     llm = api.create_llm(profile)
 
-    tts = AudioOutput()
+    tts = api.create_tts()
     memory = MemoryManager()
     filter = Filter()
 
-    core.register("asr", ASR)
+    core.register("asr", asr)
     core.register("llm", llm)
     core.register("tts", tts)
     core.register("filter", filter)

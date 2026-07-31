@@ -17,6 +17,7 @@
     }
   },
   "asr": {
+    "input_device": null,
     "model": "models/SenseVoiceSmall",
     "vad_model": "fsmn-vad",
     "device": "cpu",
@@ -27,17 +28,22 @@
     "max_single_segment_length": 20000
   },
   "tts": {
-    "engine": "edge",
+    "engine": "lux",
     "edge": {
       "voice": "zh-CN-XiaoxiaoNeural",
       "rate": "+15%",
-      "max_workers": 2
+      "max_workers": 3
     },
     "ali": {
       "api_key": "env:ALI_API",
       "model": "cosyvoice-v1",
       "voice": "longmiao",
       "sample_rate": 24000
+    },
+    "lux": {
+      "max_workers": 1,
+      "threads": 6,
+      "num_steps": 2
     }
   },
   "vad": {

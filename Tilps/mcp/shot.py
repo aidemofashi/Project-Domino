@@ -31,7 +31,7 @@ def shot_screen():
     # 保存为JPEG格式
     output = io.BytesIO()
     img = img.convert("RGB")
-    img.save(output, format='JPEG', quality=75)
+    img.save(output, format='JPEG', quality=50)
     
     base64_data = base64.b64encode(output.getvalue()).decode("utf-8")
     

@@ -3,10 +3,9 @@ import json
 
 
 class ApiManager:
-    """统一 API 配置管理器（单例）
-    
-    从 Data/api.json 加载配置，自动解析 env:XXX 环境变量引用，
-    提供配置文件查询和对象工厂方法。
+    """
+    API管理  
+    加载文件 Data/api.json
     """
     _instance = None
     _config = None
@@ -44,7 +43,7 @@ class ApiManager:
 
     # ── LLM ──────────────────────────────────────────────
 
-    def get_llm_config(self, profile="main"):
+    def get_llm_config(self, profile="main"): 
         """获取 LLM 配置字典 {api_base, api_key, model_name}"""
         cfg = self._config["llm"][profile]
         return {
@@ -95,6 +94,21 @@ class ApiManager:
             ali_cfg = cfg.get("ali", {})
             tts.voice = ali_cfg.get("voice", tts.voice)
             tts.model = ali_cfg.get("model", tts.model)
+            return tts
+        elif engine == "genie":
+            from Tilps.TTS.genie import AudioOutput
+            genie_cfg = cfg.get("genie", {})
+            max_workers = genie_cfg.get("max_workers", 2)
+            tts = AudioOutput(max_workers=max_workers)
+            return tts
+        elif engine == "lux":
+            from Tilps.TTS.lux_tts import AudioOutput
+            lux_cfg = cfg.get("lux", {})
+            max_workers = lux_cfg.get("max_workers", 1)
+            threads = lux_cfg.get("threads", 8)
+            num_steps = lux_cfg.get("num_steps", 3)
+            speed = lux_cfg.get("speed", 0.8)
+            tts = AudioOutput(max_workers=max_workers, threads=threads, num_steps=num_steps, speed=speed)
             return tts
         else:
             raise ValueError(f"不支持的 TTS 引擎: {engine}")

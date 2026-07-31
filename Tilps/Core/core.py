@@ -14,6 +14,9 @@ class RequestCore:
     AUTO_TRIGGER_LIMIT = 2
 
     def __init__(self):
+        """
+        线程管理、状态机、WebSocket
+        """
         self.request_queue = queue.Queue()
         self.state = StateManager()
         self.modules = {}
@@ -28,6 +31,9 @@ class RequestCore:
         self.ws_server.start()
 
     def register(self, name, module):
+        """
+        注册模块，将模块类放入字典
+        """
         self.modules[name] = module
 
     def emit(self, request):
@@ -109,7 +115,7 @@ class RequestCore:
                 return
 
             if chunk_text.strip():
-                tts.speak(chunk_text, interrupt=is_first_chunk)
+                tts.speak(chunk_text, interrupt=is_first_chunk, fast=is_first_chunk)
                 full_response += chunk_text
                 is_first_chunk = False
 
@@ -194,7 +200,7 @@ class RequestCore:
                     self._llm_busy = False
                     return
                 if chunk_text.strip():
-                    tts.speak(chunk_text, interrupt=is_first_chunk)
+                    tts.speak(chunk_text, interrupt=is_first_chunk, fast=is_first_chunk)
                     full_response += chunk_text
                     is_first_chunk = False
         except Exception as e:
