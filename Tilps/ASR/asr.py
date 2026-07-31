@@ -141,9 +141,11 @@ class ASR:
         """备选语音检测、在没有vad模型时使用"""
         if self.vad_model is not None:
             try:
+                # funasr 1.4.0 的流式 VAD 需要一维输入，2D (N,1) 会导致特征提取为空
+                input_1d = indata.reshape(-1) if indata.ndim > 1 else indata
                 result = self.vad_model.generate(
-                    input=indata, is_final=False, cache=self._vad_cache,
-                    chunk_size=int(len(indata) / self.fs * 1000)
+                    input=input_1d, is_final=False, cache=self._vad_cache,
+                    chunk_size=int(len(input_1d) / self.fs * 1000)
                 )
                 if result and len(result) > 0:
                     segments = result[0].get("value", [])
@@ -154,8 +156,10 @@ class ASR:
                             if has_speech or has_end:
                                 return has_speech, has_end
             except Exception as e:
-                print("VAD error: " + str(e))
-                pass
+                # 只打印一次，避免每个音频块都刷屏
+                if not getattr(self, "_vad_err_printed", False):
+                    self._vad_err_printed = True
+                    print(f"VAD error: {e} (已回退到能量检测)")
         energy = np.linalg.norm(indata) / np.sqrt(len(indata))
         return energy > 0.015, False
 

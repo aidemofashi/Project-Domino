@@ -6,7 +6,6 @@ models/
 GenieData/
 CharacterModels/
 Tilps/TTS/models/
-Tilps/TTS/tts_engine/
 shot.png
 /Data/shot.json
 /Data/chat.json

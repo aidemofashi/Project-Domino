@@ -1,4 +1,6 @@
+import os
 import queue
+import subprocess
 import threading
 import time
 import keyboard
@@ -6,16 +8,15 @@ import keyboard
 from Tilps.Core.request import Request, RequestType, Priority
 from Tilps.Core.state import AppState, StateManager
 from Tilps.Core.pipeline import Pipeline
-from Tilps.Core.ws_server import WebSocketServer
 from Tilps.ASR.asr import ASR
 
 
 class RequestCore:
     AUTO_TRIGGER_LIMIT = 2
 
-    def __init__(self):
+    def __init__(self, enable_ws=True, enable_ui=True):
         """
-        线程管理、状态机、WebSocket
+        线程管理、状态机、WebSocket(可选)、UI(可选)
         """
         self.request_queue = queue.Queue()
         self.state = StateManager()
@@ -26,9 +27,44 @@ class RequestCore:
         self._llm_busy = False
         self._memory_lock = threading.Lock()
         self._compacting = False
-        self.ws_server = WebSocketServer()
-        self.ws_server.set_on_user_text(self._on_ws_text)
-        self.ws_server.start()
+        self.ws_server = None
+        self.ui_process = None
+
+        if enable_ws:
+            from Tilps.Core.ws_server import WebSocketServer
+            self.ws_server = WebSocketServer()
+            self.ws_server.set_on_user_text(self._on_ws_text)
+            self.ws_server.start()
+            print("[WS] WebSocket 服务器已启动")
+        else:
+            print("[WS] 已禁用 WebSocket 服务器")
+
+        if enable_ui:
+            self._launch_ui()
+        else:
+            print("[UI] 已禁用界面")
+
+    def _launch_ui(self):
+        """启动 Tauri UI 进程（可选的 UI 模块）"""
+        ui_exe = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "Ui", "tauri", "src-tauri", "target", "release", "domino-ui.exe",
+        )
+        if not os.path.exists(ui_exe):
+            print(f"[UI] 未找到 UI 程序: {ui_exe}")
+            return
+        try:
+            self.ui_process = subprocess.Popen([ui_exe])
+            print(f"[UI] 已启动 UI: {ui_exe}")
+        except Exception as e:
+            print(f"[UI] 启动失败: {e}")
+            self.ui_process = None
+
+    def _ws_send(self, method, *args, **kwargs):
+        """仅在启用了 ws_server 时发送消息"""
+        if self.ws_server is None:
+            return
+        getattr(self.ws_server, method)(*args, **kwargs)
 
     def register(self, name, module):
         """
@@ -64,7 +100,7 @@ class RequestCore:
             self.state.mark_activity()
             return
 
-        self.ws_server.send_user(text)
+        self._ws_send("send_user", text)
         self.emit(
             Request(
                 type=RequestType.VOICE_INPUT,
@@ -101,7 +137,7 @@ class RequestCore:
         messages.append(user_msg)
 
         print(">>> 助手思考中 (流式播报)...")
-        self.ws_server.send_status("助手思考中")
+        self._ws_send("send_status", "助手思考中")
         full_response = ""
 
         self._llm_busy = True
@@ -110,7 +146,7 @@ class RequestCore:
             if self.state.consume_interrupt():
                 tts.stop()
                 print("\n>>> 被语音打断")
-                self.ws_server.send_status("被语音打断")
+                self._ws_send("send_status", "被语音打断")
                 self._llm_busy = False
                 return
 
@@ -122,7 +158,7 @@ class RequestCore:
         self._llm_busy = False
 
         if full_response:
-            self.ws_server.send_domino(full_response)
+            self._ws_send("send_domino", full_response)
             self._append_chat({
                 "role": "user",
                 "content": text,
@@ -167,7 +203,7 @@ class RequestCore:
 
     def _process_timer_request(self):
         print("\n[主动触发] 静音已达阈值")
-        self.ws_server.send_status("多咪主动触发对话")
+        self._ws_send("send_status", "多咪主动触发对话")
         llm = self.modules["llm"]
         tts = self.modules["tts"]
         shot = self.modules["shot"]
@@ -214,7 +250,7 @@ class RequestCore:
 
         if full_response:
             date_time = time.strftime("%Y-%m-%d %H:%M:%S")
-            self.ws_server.send_domino(full_response)
+            self._ws_send("send_domino", full_response)
             self._append_chat({
                 "role": "user",
                 "content": "瞧",
@@ -257,6 +293,11 @@ class RequestCore:
 
         while self._running:
             try:
+                # 启用了 UI 时，UI 关闭则退出
+                if self.ui_process is not None and self.ui_process.poll() is not None:
+                    print("\n>>> UI 已关闭，退出")
+                    break
+
                 if self.state.get_state() == AppState.IDLE:
                     if self.state.should_trigger(self.silence_timeout, self.AUTO_TRIGGER_LIMIT):
                         self._process_timer_request()
@@ -287,7 +328,15 @@ class RequestCore:
 
     def shutdown(self):
         self._running = False
-        self.ws_server.shutdown()
+        if self.ws_server is not None:
+            self.ws_server.shutdown()
+        if self.ui_process is not None and self.ui_process.poll() is None:
+            print("\n>>> 关闭 UI...")
+            self.ui_process.terminate()
+            try:
+                self.ui_process.wait(timeout=5)
+            except Exception:
+                self.ui_process.kill()
         if "asr" in self.modules:
             self.modules["asr"].stop_streaming()
         if "tts" in self.modules:

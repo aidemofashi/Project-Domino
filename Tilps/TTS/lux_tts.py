@@ -10,7 +10,7 @@ import sounddevice as sd
 
 class AudioOutput:
     def __init__(self, max_workers=1, threads=8, num_steps=3, speed=0.8):
-        from .tts_engine.luxtts import LuxTTS
+        from .tts_engine.luxtts.luxvoice import LuxTTS
 
         self.script_dir = Path(__file__).parent.absolute()
         self.ref_wav = str(self.script_dir / "reference" / "feibi.wav")
@@ -40,7 +40,7 @@ class AudioOutput:
         threading.Thread(target=self._play_worker, daemon=True).start()
 
     def _init_lux(self):
-        from .zipvoice.luxvoice import LuxTTS
+        from .tts_engine.luxtts.luxvoice import LuxTTS
         model_dir = str(self.script_dir / "models" / "lux")
         return LuxTTS(model_dir, device='cpu', threads=self.threads)
 

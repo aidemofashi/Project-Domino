@@ -15,7 +15,12 @@ DEVICE = os.getenv("DEVICE", "cpu")
 
 def main():
     api = ApiManager()
-    core = RequestCore()
+    sys_cfg = api.get_system_config()
+
+    core = RequestCore(
+        enable_ws=sys_cfg.get("enable_ws", True),
+        enable_ui=sys_cfg.get("enable_ui", True),
+    )
 
     asr_config = api.get_asr_config(DEVICE)
     asr = ASR()
@@ -35,7 +40,6 @@ def main():
     core.register("memory", memory)
     core.register("shot", shot_screen)
 
-    sys_cfg = api.get_system_config()
     core.silence_timeout = sys_cfg["silence_timeout"]
     core.make_memory = sys_cfg["make_memory"]
 

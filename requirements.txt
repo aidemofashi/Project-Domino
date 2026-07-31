@@ -17,3 +17,5 @@ openai>=0.28.0,<1.0.0
 keyboard>=0.13.5
 
 Pillow
+
+funasr==1.4.0

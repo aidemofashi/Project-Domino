@@ -55,6 +55,8 @@
   },
   "system": {
     "silence_timeout": 60,
-    "make_memory": 16
+    "make_memory": 16,
+    "enable_ui": false,
+    "enable_ws": false
   }
 }
