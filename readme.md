@@ -5,7 +5,7 @@
 ![logo](./Domino.png)
 [![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/aidemofashi/Project-Domino)
 
-为什么会有Project_Domion？  
+为什么会有Project_Domino？  
 ==========================
 
 Project_Domion 是致力于让任何人和任何机器都能体验到全模态的本地ai陪伴的项目。  
@@ -33,7 +33,7 @@ Domino后续将会提供完整的各项功能自定义网络提供商接口，�
 开发环境：  
 windows10  
 cpu:12490f  
-gpu:6650xt (未使用GPU加速)  
+gpu:6650xt 
 ram:16gb  
 
 ## 将要实现
