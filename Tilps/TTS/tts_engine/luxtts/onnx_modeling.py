@@ -47,6 +47,13 @@ class OnnxModel:
 
         self.session_opts = session_opts
 
+        # 优先用 DirectML GPU，回退 CPU
+        if "DmlExecutionProvider" in ort.get_available_providers():
+            self.providers = ["DmlExecutionProvider", "CPUExecutionProvider"]
+            print("[LuxTTS] Using DirectML (GPU)")
+        else:
+            self.providers = ["CPUExecutionProvider"]
+
         self.init_text_encoder(text_encoder_path)
         self.init_fm_decoder(fm_decoder_path)
 
@@ -54,14 +61,14 @@ class OnnxModel:
         self.text_encoder = ort.InferenceSession(
             model_path,
             sess_options=self.session_opts,
-            providers=["CPUExecutionProvider"],
+            providers=self.providers,
         )
 
     def init_fm_decoder(self, model_path: str):
         self.fm_decoder = ort.InferenceSession(
             model_path,
             sess_options=self.session_opts,
-            providers=["CPUExecutionProvider"],
+            providers=self.providers,
         )
         meta = self.fm_decoder.get_modelmeta().custom_metadata_map
         self.feat_dim = int(meta["feat_dim"])

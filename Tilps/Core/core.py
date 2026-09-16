@@ -12,7 +12,8 @@ from Tilps.ASR.asr import ASR
 
 
 class RequestCore:
-    AUTO_TRIGGER_LIMIT = 2
+    AUTO_TRIGGER_LIMIT = 1 
+    """分钟"""
 
     def __init__(self, enable_ws=True, enable_ui=True):
         """
@@ -139,6 +140,7 @@ class RequestCore:
         print(">>> 助手思考中 (流式播报)...")
         self._ws_send("send_status", "助手思考中")
         full_response = ""
+        req_start = time.time()
 
         self._llm_busy = True
         is_first_chunk = True
@@ -151,6 +153,9 @@ class RequestCore:
                 return
 
             if chunk_text.strip():
+                if is_first_chunk:
+                    t = time.strftime("%Y-%m-%d %H:%M:%S")
+                    print(f"[{t}] LLM 首字 ({time.time()-req_start:.2f}s)")
                 tts.speak(chunk_text, interrupt=is_first_chunk, fast=is_first_chunk)
                 full_response += chunk_text
                 is_first_chunk = False

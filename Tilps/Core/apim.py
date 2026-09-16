@@ -108,7 +108,8 @@ class ApiManager:
             threads = lux_cfg.get("threads", 8)
             num_steps = lux_cfg.get("num_steps", 3)
             speed = lux_cfg.get("speed", 0.8)
-            tts = AudioOutput(max_workers=max_workers, threads=threads, num_steps=num_steps, speed=speed)
+            flush_delay = lux_cfg.get("flush_delay", 1.0)
+            tts = AudioOutput(max_workers=max_workers, threads=threads, num_steps=num_steps, speed=speed, flush_delay=flush_delay)
             return tts
         else:
             raise ValueError(f"不支持的 TTS 引擎: {engine}")

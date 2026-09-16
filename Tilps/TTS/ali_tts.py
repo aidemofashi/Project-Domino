@@ -124,7 +124,7 @@ class AudioOutput:
                 self._set_state(TTSState.IDLE)
             time.sleep(0.1)
 
-    def speak(self, text, interrupt=False):
+    def speak(self, text, interrupt=False, fast=False):
         if interrupt:
             self.stop()
             gen = self._next_gen()

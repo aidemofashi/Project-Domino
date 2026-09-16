@@ -58,7 +58,7 @@ class AudioOutput:
             except Exception as e:
                 print(f">>> [TTS] 合成失败: {e}")
 
-    def speak(self, text, interrupt=False):
+    def speak(self, text, interrupt=False, fast=False):
         if interrupt:
             self.stop()
         cleaned = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9，。！？]', '', text).strip()

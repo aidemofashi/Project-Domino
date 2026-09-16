@@ -6,7 +6,7 @@
       "model_name": "qwen/qwen3-vl-4b"
     },
     "main_cuda": {
-      "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "api_base": "https://dashscope.aliyuncs.com/api/v1",
       "api_key": "env:ALI_API",
       "model_name": "qwen3.5-flash"
     },
@@ -14,6 +14,11 @@
       "api_base": "http://127.0.0.1:8888/v1",
       "api_key": "env:ALI_API",
       "model_name": "qwen/qwen3-vl-4b"
+    },
+      "omni": {
+      "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "api_key": "env:ALI_API",
+      "model_name": "qwen3.7-flash"
     }
   },
   "asr": {
@@ -28,7 +33,7 @@
     "max_single_segment_length": 20000
   },
   "tts": {
-    "engine": "lux",
+    "engine": "edge",
     "edge": {
       "voice": "zh-CN-XiaoxiaoNeural",
       "rate": "+15%",
