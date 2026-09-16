@@ -1,16 +1,21 @@
 ﻿sounddevice>=0.4.0
 numpy>=1.21.0
-
-funasr>=1.0.0
+soundfile
+pydub
+miniaudio
 torch
 torchaudio
 
-dashscope>=1.15.0
-edge-tts
+funasr
+vosk
 
-keyboard>=0.13.5
+edge-tts
+dashscope>=1.15.0
 
 openai>=0.28.0,<1.0.0
 
-pydub
-vosk
+keyboard>=0.13.5
+
+Pillow
+
+funasr==1.4.0

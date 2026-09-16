@@ -28,17 +28,10 @@ def shot_screen():
     if max(img.size) > 1024:
         img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
     
-    # 保存为WebP格式（比JPEG小30%左右）
+    # 保存为JPEG格式
     output = io.BytesIO()
-    
-    # WebP参数优化
-    # quality: 0-100，建议75-85之间
-    # method: 0-6，值越大压缩越慢但效果越好
-    img.save(output, 
-             format='WebP', 
-             quality=50,      # 适当降低质量
-             method=6,        # 最大压缩率
-             lossless=False)  # 使用有损压缩
+    img = img.convert("RGB")
+    img.save(output, format='JPEG', quality=50)
     
     base64_data = base64.b64encode(output.getvalue()).decode("utf-8")
     
