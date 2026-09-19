@@ -19,3 +19,5 @@ keyboard>=0.13.5
 Pillow
 
 funasr==1.4.0
+
+websockets>=12.0

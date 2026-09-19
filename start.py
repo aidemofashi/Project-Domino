@@ -2,6 +2,7 @@ import os
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
+from Tilps.Core import logger
 from Tilps.Core.apim import ApiManager
 from Tilps.ASR.asr import ASR
 from Tilps.LLM.filter import Filter
@@ -16,10 +17,17 @@ DEVICE = os.getenv("DEVICE", "cpu")
 def main():
     api = ApiManager()
     sys_cfg = api.get_system_config()
+    log_cfg = api.get_log_config()
+    ws_cfg = api.get_ws_config()
+
+    logger.setup_logging(log_cfg["level"])
 
     core = RequestCore(
-        enable_ws=sys_cfg.get("enable_ws", True),
-        enable_ui=sys_cfg.get("enable_ui", True),
+        enable_ws=ws_cfg["enable_ws"],
+        enable_ui=sys_cfg.get("enable_ui", False),
+        ws_host=ws_cfg["host"],
+        ws_port=ws_cfg["port"],
+        log_level=log_cfg["level"],
     )
 
     asr_config = api.get_asr_config(DEVICE)

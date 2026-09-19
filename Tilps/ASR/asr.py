@@ -40,6 +40,8 @@ class ASR:
 
     def start_streaming(self, on_interrupt=None, on_result=None):
         """流程启动前准备配置"""
+        if self._listening and self._thread is not None and self._thread.is_alive():
+            return
         self._on_interrupt = on_interrupt
         self._on_result = on_result
         self._listening = True

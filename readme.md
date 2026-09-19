@@ -10,9 +10,10 @@
   <p>
     <a href="https://github.com/aidemofashi/Project-Domino"><img src="https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=whit" alt="Codex Custom Pet"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-22c55e?style=flat-square" alt="MIT License"></a>
+    <h1></h1>
+    <iframe src="//player.bilibili.com/player.html?isOutside=true&aid=117297838625210&bvid=BV1Hyeh6VENJ&cid=42032105650&p=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>
   </p>
 </div>
-
 <center><b>完全本地化的陪伴形态Agent</b></center>
 
 ## 为什么会有Project_Domino？  

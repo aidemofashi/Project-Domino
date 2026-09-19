@@ -1,5 +1,6 @@
 import os
 import json
+import copy
 
 
 class ApiManager:
@@ -34,6 +35,28 @@ class ApiManager:
     def reload(self):
         """重新加载配置文件"""
         self._config = self._load(self._config_path)
+
+    def config_path(self):
+        """配置文件绝对路径"""
+        return os.path.abspath(self._config_path)
+
+    def raw_config(self):
+        """返回未经 env 解析的原始配置副本（供界面编辑）"""
+        return copy.deepcopy(self._config)
+
+    def save_config(self, data):
+        """用一个完整的 JSON 对象覆盖写回配置文件，并立即生效。"""
+        if not isinstance(data, dict):
+            raise ValueError("配置必须是 JSON 对象")
+        try:
+            json.dumps(data, ensure_ascii=False)
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"配置无法序列化为 JSON: {e}")
+        with open(self._config_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        self._config = copy.deepcopy(data)
+        return self.config_path()
 
     def _resolve(self, value):
         """将 env:XXX 格式的值解析为环境变量"""
@@ -128,3 +151,19 @@ class ApiManager:
     def get_system_config(self):
         """获取系统运行参数"""
         return dict(self._config["system"])
+
+    def get_ws_config(self):
+        """获取界面 WebSocket 接口配置"""
+        system = self._config.get("system", {})
+        return {
+            "enable_ws": system.get("enable_ws", True),
+            "host": system.get("ws_host", "127.0.0.1"),
+            "port": int(system.get("ws_port", 8765)),
+        }
+
+    def get_log_config(self):
+        """获取日志配置 {level}"""
+        system = self._config.get("system", {})
+        return {
+            "level": str(system.get("log_level", "INFO")).upper(),
+        }
